@@ -1,0 +1,19 @@
+body {
+  background-color: white;
+}
+
+#board {
+  background-color: ForestGreen;
+  display: flex;
+  flex-direction: row;
+  flex-wrap: wrap;
+  width: 408px;
+}
+
+.square {
+  width: 50px;
+  height: 50px;
+  border: 1px solid black;
+  margin-left: -1px;
+  margin-top: -1px;
+}
