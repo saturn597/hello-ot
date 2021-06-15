@@ -3,7 +3,6 @@ body {
 }
 
 #board {
-  background-color: ForestGreen;
   display: flex;
   flex-direction: row;
   flex-wrap: wrap;
@@ -11,7 +10,7 @@ body {
 }
 
 .square {
-  background-color: transparent;
+  background-color: ForestGreen;
   border: 1px solid black;
   display: flex;
   margin-left: -1px;
