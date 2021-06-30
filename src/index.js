@@ -2,6 +2,9 @@ import React from 'react';
 import ReactDOM from 'react-dom';
 import './index.css';
 
+const BOARDWIDTH = 8;
+const BOARDHEIGHT = 8;
+
 class Board extends React.Component {
   render() {
     const squares = this.props.squares.map((sq, i) =>
@@ -29,16 +32,20 @@ class Game extends React.Component {
   constructor(props) {
     super(props);
 
-    const squares = Array(64).fill(null);
+    const squares = Array(BOARDWIDTH * BOARDHEIGHT).fill(null);
 
-    // Conventional starting state for the board:
-    squares[27] = false;
-    squares[28] = true;
-    squares[35] = true;
-    squares[36] = false;
+    // Conventional starting state for the board - black and white diagonal to
+    // each other at the center of the board
+    const halfHeight = Math.floor(BOARDHEIGHT / 2);
+    const halfWidth = Math.floor(BOARDWIDTH / 2);
+    const base = (halfHeight - 1) * BOARDWIDTH + halfWidth - 1;
+    squares[base] = false;
+    squares[base + 1] = true;
+    squares[base + BOARDWIDTH] = true;
+    squares[base + BOARDWIDTH + 1] = false;
 
     this.state = {
-      score: {true: 0, false: 0},
+      score: calcScore(squares),
       squares,
       turn: true,
     };
@@ -55,8 +62,6 @@ class Game extends React.Component {
     // claim clicked square for the current player
     squares[id] = turn;
 
-    let score = Object.assign({}, this.state.score);
-
     const captures = getAllCaptures(id, squares, turn);
 
     // Move is only valid if it results in captures
@@ -69,11 +74,9 @@ class Game extends React.Component {
       squares[c] = turn;
     }
 
-    score[turn] += captures.length;
-
     turn = !turn;
     this.setState({
-      score,
+      score: calcScore(squares),
       squares,
       turn,
     });
@@ -110,6 +113,15 @@ function Square(props) {
   );
 }
 
+function calcScore(squares) {
+    let score = {};
+    score[true] = squares.reduce(
+      (acc, square) => square ? acc + 1 : acc, 0);
+    score[false] = squares.reduce(
+      (acc, square) => square === false ? acc + 1 : acc, 0);
+    return score;
+}
+
 function getAllCaptures(position, squares, player) {
     // If the given "player" (either true, false, or null) places a piece at
     // "position" in the array of "squares", return the element numbers in
@@ -140,13 +152,12 @@ function getCaptures(row, squares, player) {
   // telling us if it's black's or white's turn.
 
   // If "row" starts with a consecutive series of squares controlled by the
-  // oppositve player, and that series is followed by a square controlled by
+  // opposite player, and that series is followed by a square controlled by
   // "player", then the series of squares controlled by the opposite player is
   // considered a potential capture.
 
   // Returns an array of squares (represented as indices into "squares") that
   // can be captured if the player places a piece at the head of the row.
-
 
   let curr = 0;
   let captures = [];
@@ -170,27 +181,22 @@ function getRow(start, xStep, yStep) {
 
   // Given a "start" position in an 8x8 matrix, this function returns a row
   // whose direction is described by "xStep" and "yStep" (not including the
-  // start position).For example, if xStep is 0 and yStep is -1, this will
+  // start position). For example, if xStep is 0 and yStep is -1, this will
   // return the element numbers for cells in the row going straight down the
   // board from the given starting position. If yStep is +1, the row will go
   // straight down the board from the starting position. Etc.
-
   const row = [];
 
-  let curr = start;
-  let currX;
-  let currY;
+  // Translate our start position into x and y coordinates on the board and
+  // take one step
+  let currX = start % BOARDWIDTH + xStep;
+  let currY = Math.floor(start / BOARDWIDTH) + yStep;
 
-  while (true) {
-    currX = curr % 8;
-    currY = Math.floor(curr / 8);
+  // Now continue taking steps and adding to our "row"
+  while (currX >= 0 && currX < BOARDWIDTH && currY >= 0 && currY < BOARDHEIGHT) {
+    row.push(currY * BOARDWIDTH + currX);
     currX += xStep;
     currY += yStep;
-    if (currX < 0 || currX > 7 || currY < 0 || currY > 7) {
-      break;
-    }
-    curr = currY * 8 + currX;
-    row.push(curr);
   }
   return row;
 }
