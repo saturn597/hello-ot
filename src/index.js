@@ -5,6 +5,11 @@ import './index.css';
 const BOARDWIDTH = 8;
 const BOARDHEIGHT = 8;
 
+const STATES = {
+  'active': 0,
+  'complete': 1,
+};
+
 class Board extends React.Component {
   render() {
     const squares = this.props.squares.map((sq, i) =>
@@ -45,6 +50,7 @@ class Game extends React.Component {
     squares[base + BOARDWIDTH + 1] = false;
 
     this.state = {
+      gameState: STATES.active,
       score: calcScore(squares),
       squares,
       turn: true,
@@ -74,8 +80,21 @@ class Game extends React.Component {
       squares[c] = turn;
     }
 
-    turn = !turn;
+    let gameState = this.state.gameState;
+
+    const playerCaptures = getMoves(squares, turn);
+    const opponentCaptures = getMoves(squares, !turn);
+
+    if (opponentCaptures.length > 0) {
+       // Switch to the other player's turn if they have valid moves
+       turn = !turn;
+    } else if (playerCaptures.length === 0) {
+      // If no one has valid moves, that's the end of the game
+      gameState = STATES.complete;
+    }
+
     this.setState({
+      gameState,
       score: calcScore(squares),
       squares,
       turn,
@@ -84,10 +103,23 @@ class Game extends React.Component {
 
 
   render() {
+    let leaderDesc = '\u00A0';
+    if (this.state.gameState === STATES.complete) {
+      if (this.state.score[true] > this.state.score[false]) {
+        leaderDesc = 'Black wins!';
+      } else if (this.state.score[true] < this.state.score[false]) {
+        leaderDesc = 'White wins!';
+      } else {
+        leaderDesc = 'It\'s a tie!';
+      }
+    }
+    leaderDesc = <div>{leaderDesc}</div>;
+
     return (
       <div id="main">
         <div id="gameStats">
           <Square status={this.state.turn} />
+          { leaderDesc }
           Black: {this.state.score[true]} |
           White: {this.state.score[false]}
         </div>
@@ -112,6 +144,7 @@ function Square(props) {
     </button>
   );
 }
+
 
 function calcScore(squares) {
     let score = {};
@@ -201,6 +234,20 @@ function getRow(start, xStep, yStep) {
   return row;
 }
 
+function getMoves(squares, player) {
+  const moves = [];
+
+  for (let i = 0; i < squares.length; i++) {
+    const numCaptures = getAllCaptures(i, squares, player).length;
+    if (numCaptures > 0 && squares[i] === null) {
+      // A move is valid if at least 1 capture will result and the square is
+      // empty
+      moves.push(i);
+    }
+  }
+
+  return moves;
+}
 
 
 ReactDOM.render(
