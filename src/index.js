@@ -10,18 +10,16 @@ const STATES = {
   'complete': 1,
 };
 
-class Board extends React.Component {
-  render() {
-    const squares = this.props.squares.map((sq, i) =>
-      <Square
-        key={i}
-        onClick={() => this.props.onClick(i)}
-        status={sq}
-       >
-      </Square>
-    );
-    return <div id="board">{squares}</div>;
-  }
+function Board(props) {
+  const squares = props.squares.map((sq, i) =>
+    <Square
+      key={i}
+      onClick={() => props.onClick(i)}
+      status={sq}
+     >
+    </Square>
+  );
+  return <div id="board">{squares}</div>;
 }
 
 class Game extends React.Component {
@@ -57,23 +55,20 @@ class Game extends React.Component {
     };
   }
 
-  handleClick(id) {
+  handleClick(square) {
     let squares = this.state.squares.slice();
     let turn = this.state.turn;
 
-    if (squares[id] !== null) {
+    const captures = getAllCaptures(square, squares, turn);
+
+    if (squares[square] !== null || captures.length === 0) {
+      // must be in an unoccupied square and turn some of the opponent's
+      // pieces, or the move is invalid
       return;
     }
 
     // claim clicked square for the current player
-    squares[id] = turn;
-
-    const captures = getAllCaptures(id, squares, turn);
-
-    // Move is only valid if it results in captures
-    if (captures.length === 0) {
-      return;
-    }
+    squares[square] = turn;
 
     // Change the captured squares to the appropriate color
     for (let c of captures) {
@@ -235,15 +230,14 @@ function getRow(start, xStep, yStep) {
 }
 
 function getMoves(squares, player) {
-  const moves = [];
+  // Get valid moves on a board described by squares for the given player.
+  // A move is valid if at least 1 capture will result and the square is empty
 
+  let moves = [];
   for (let i = 0; i < squares.length; i++) {
-    const numCaptures = getAllCaptures(i, squares, player).length;
-    if (numCaptures > 0 && squares[i] === null) {
-      // A move is valid if at least 1 capture will result and the square is
-      // empty
-      moves.push(i);
-    }
+     if (squares[i] === null && getAllCaptures(i, squares, player).length > 0) {
+       moves.push(i);
+    } 
   }
 
   return moves;
