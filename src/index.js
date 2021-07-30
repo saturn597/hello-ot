@@ -10,6 +10,10 @@ const STATES = {
   'complete': 1,
 };
 
+const loc = window.location;
+const ws_port = 10001;
+const ws_url = 'wss://' + loc.hostname + ':' + ws_port + loc.pathname;
+
 function Board(props) {
   const squares = props.squares.map((sq, i) =>
     <Square
@@ -52,7 +56,23 @@ class Game extends React.Component {
       score: calcScore(squares),
       squares,
       turn: true,
+      ws: null,
     };
+  }
+
+  componentDidMount() {
+    const ws = new WebSocket(ws_url);
+    ws.onerror = err => {
+      console.log(err);
+    }
+    ws.onclose = e => {
+      console.log('closed');
+      console.log(e);
+    }
+    ws.onmessage = msg => {
+      console.log('message: %s', msg.data);
+    };
+    this.setState({ ws });
   }
 
   handleClick(squareClicked) {
@@ -82,6 +102,8 @@ class Game extends React.Component {
       const playerCaptures = getMoves(squares, turn);
       const opponentCaptures = getMoves(squares, !turn);
 
+      const move = { player: turn, square: squareClicked };
+      state.ws.send(JSON.stringify(move));
       if (opponentCaptures.length > 0) {
          // Switch to the other player's turn if they have valid moves
          turn = !turn;
