@@ -14,6 +14,49 @@ const loc = window.location;
 const ws_port = 10001;
 const ws_url = 'wss://' + loc.hostname + ':' + ws_port + loc.pathname;
 
+class App extends React.Component {
+  constructor() {
+    super();
+    this.state = {
+      selected: false,
+      player: null,
+      ws: null,
+    };
+  }
+
+  componentDidMount() {
+    const ws = new WebSocket(ws_url);
+    ws.onerror = err => {
+      console.log(err);
+    }
+    ws.onclose = e => {
+      console.log('closed');
+      console.log(e);
+    }
+    ws.onmessage = msg => {
+      console.log('message: %s', msg.data);
+    };
+
+    this.selectionMade = this.selectionMade.bind(this);
+
+    this.setState({ ws });
+  }
+
+  selectionMade(player) {
+    this.setState({
+      player,
+      selected: true,
+    });
+  }
+
+  render() {
+    if (!this.state.selected) {
+      return <GameSelection selectionMade={this.selectionMade} />;
+    }
+    return <Game ws={this.state.ws} player={this.state.player}/>;
+  }
+}
+
 function Board(props) {
   const squares = props.squares.map((sq, i) =>
     <Square
@@ -56,23 +99,7 @@ class Game extends React.Component {
       score: calcScore(squares),
       squares,
       turn: true,
-      ws: null,
     };
-  }
-
-  componentDidMount() {
-    const ws = new WebSocket(ws_url);
-    ws.onerror = err => {
-      console.log(err);
-    }
-    ws.onclose = e => {
-      console.log('closed');
-      console.log(e);
-    }
-    ws.onmessage = msg => {
-      console.log('message: %s', msg.data);
-    };
-    this.setState({ ws });
   }
 
   handleClick(squareClicked) {
@@ -102,8 +129,6 @@ class Game extends React.Component {
       const playerCaptures = getMoves(squares, turn);
       const opponentCaptures = getMoves(squares, !turn);
 
-      const move = { player: turn, square: squareClicked };
-      state.ws.send(JSON.stringify(move));
       if (opponentCaptures.length > 0) {
          // Switch to the other player's turn if they have valid moves
          turn = !turn;
@@ -111,6 +136,9 @@ class Game extends React.Component {
         // If no one has valid moves, that's the end of the game
         gameState = STATES.complete;
       }
+
+      const move = { player: turn, square: squareClicked };
+      props.ws.send(JSON.stringify(move));
 
       return {
         gameState,
@@ -150,6 +178,22 @@ class Game extends React.Component {
       </div>
     );
   }
+}
+
+function GameSelection(props) {
+  return (
+    <div>
+      <button onClick={() => props.selectionMade(true)}>
+        Play as black
+      </button>
+      <button onClick={() => props.selectionMade(false)}>
+        Play as white
+      </button>
+      <button onClick={() => props.selectionMade(null)}>
+        Play offline
+      </button>
+    </div>
+  );
 }
 
 function Square(props) {
@@ -270,6 +314,6 @@ function getMoves(squares, player) {
 
 
 ReactDOM.render(
-  <Game />,
+  <App />,
   document.getElementById('root')
 );
