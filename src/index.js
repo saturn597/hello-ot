@@ -55,44 +55,47 @@ class Game extends React.Component {
     };
   }
 
-  handleClick(square) {
-    let squares = this.state.squares.slice();
-    let turn = this.state.turn;
+  handleClick(squareClicked) {
+    this.setState((state, props) => {
+      let gameState = state.gameState;
 
-    const captures = getAllCaptures(square, squares, turn);
+      let turn = state.turn;
 
-    if (squares[square] !== null || captures.length === 0) {
-      // must be in an unoccupied square and turn some of the opponent's
-      // pieces, or the move is invalid
-      return;
-    }
+      let squares = state.squares.slice();
 
-    // claim clicked square for the current player
-    squares[square] = turn;
+      const captures = getAllCaptures(squareClicked, squares, turn);
 
-    // Change the captured squares to the appropriate color
-    for (let c of captures) {
-      squares[c] = turn;
-    }
+      if (squares[squareClicked] !== null || captures.length === 0) {
+        // must be in an unoccupied square and turn some of the opponent's
+        // pieces, or the move is invalid
+        return;
+      }
 
-    let gameState = this.state.gameState;
+      // claim clicked square for the current player
+      squares[squareClicked] = turn;
 
-    const playerCaptures = getMoves(squares, turn);
-    const opponentCaptures = getMoves(squares, !turn);
+      // Change the captured squares to the appropriate color
+      for (let c of captures) {
+        squares[c] = turn;
+      }
 
-    if (opponentCaptures.length > 0) {
-       // Switch to the other player's turn if they have valid moves
-       turn = !turn;
-    } else if (playerCaptures.length === 0) {
-      // If no one has valid moves, that's the end of the game
-      gameState = STATES.complete;
-    }
+      const playerCaptures = getMoves(squares, turn);
+      const opponentCaptures = getMoves(squares, !turn);
 
-    this.setState({
-      gameState,
-      score: calcScore(squares),
-      squares,
-      turn,
+      if (opponentCaptures.length > 0) {
+         // Switch to the other player's turn if they have valid moves
+         turn = !turn;
+      } else if (playerCaptures.length === 0) {
+        // If no one has valid moves, that's the end of the game
+        gameState = STATES.complete;
+      }
+
+      return {
+        gameState,
+        score: calcScore(squares),
+        squares,
+        turn,
+      };
     });
   }
 
