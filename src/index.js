@@ -20,6 +20,7 @@ class App extends React.Component {
     this.state = {
       selected: false,
       player: null,
+      waiting: { true: 0, false: 0 },  // # games awaiting a given color
       ws: null,
     };
   }
@@ -30,11 +31,14 @@ class App extends React.Component {
       console.log(err);
     }
     ws.onclose = e => {
-      console.log('closed');
       console.log(e);
     }
     ws.onmessage = msg => {
       console.log('message: %s', msg.data);
+      const parsed = JSON.parse(msg.data);
+      if ('waiting' in parsed) {
+        this.setState({ waiting: parsed.waiting });
+      }
     };
 
     this.selectionMade = this.selectionMade.bind(this);
@@ -43,6 +47,11 @@ class App extends React.Component {
   }
 
   selectionMade(player) {
+    // Player selected the color they want to play as
+    const ws = this.state.ws;
+    if (player !== null && ws.readyState === WebSocket.OPEN) {
+      ws.send(JSON.stringify({ joinAs: player }));
+    }
     this.setState({
       player,
       selected: true,
@@ -51,7 +60,12 @@ class App extends React.Component {
 
   render() {
     if (!this.state.selected) {
-      return <GameSelection selectionMade={this.selectionMade} />;
+      return (
+        <GameSelection
+          selectionMade={this.selectionMade}
+          waiting={this.state.waiting}
+        />
+      );
     }
     return <Game ws={this.state.ws} player={this.state.player}/>;
   }
@@ -181,13 +195,15 @@ class Game extends React.Component {
 }
 
 function GameSelection(props) {
+  const t = props.waiting[true];
+  const f = props.waiting[false];
   return (
     <div>
       <button onClick={() => props.selectionMade(true)}>
-        Play as black
+        Play as black { t > 0 ? '(' + t + ')' : '' }
       </button>
       <button onClick={() => props.selectionMade(false)}>
-        Play as white
+        Play as white { f > 0 ? '(' + f + ')' : ''}
       </button>
       <button onClick={() => props.selectionMade(null)}>
         Play offline
@@ -306,7 +322,7 @@ function getMoves(squares, player) {
   for (let i = 0; i < squares.length; i++) {
      if (squares[i] === null && getAllCaptures(i, squares, player).length > 0) {
        moves.push(i);
-    } 
+    }
   }
 
   return moves;

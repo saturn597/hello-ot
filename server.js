@@ -6,40 +6,124 @@ const https = require('https');
 const path = require('path');
 const ws = require('ws');
 
-class Connection {
-  constructor(socket, player) {
-    this.socket = socket;
-    this.player = player;
-  }
-}
 
 class Game {
   constructor() {
-    this.connections = [];
+    // "true" plays as black, "false" plays as white
+    this.players = { true: null, false: null };
+
+    this.onJoin = () => {};
+    this.onEnd = () => {};
   }
 
-  addConnection(socket) {
-    if (this.connections.length > 1) {
-      return false;
-    }
+  join(player, color) {
+    this.players[color] = player;
+    this.onJoin();
+  }
 
-    // first player is black/true, second player is white/false
-    const player = this.connections.length == 0;
-
-    const connection = new Connection(socket, player);
-    this.connections.push(connection);
-
-    socket.send(JSON.stringify({ color: player }));
-    socket.on('close', () => {
-      for (let connection of this.connections) {
-        connection.socket.close();
-      }
-      this.connections = [];
-    });
-
-    return connection;
+  end() {
+    this.onEnd(this);
   }
 }
+
+
+class Player {
+  constructor(ws, server) {
+    this.game = null;
+
+    this.server = server;
+    this.ws = ws;
+
+    ws.on('message', msg => {
+      console.log('received: %s', msg);
+
+      const parsed = JSON.parse(msg);
+
+      // client wants to join a game as a specific color
+      if ('joinAs' in parsed) {
+        const color = parsed['joinAs'];
+        let game = this.server.getGame(color);
+        game.join(this, color);
+        this.game = game;
+      }
+    });
+
+    ws.on('close', e => {
+      if (this.game !== null) {
+        this.game.end();
+        this.game = null;
+      }
+    });
+  }
+}
+
+
+class OthelloServer extends ws.Server {
+  constructor(options) {
+    super(options);
+
+    this.games = [];
+
+    this.on('connection', ws => {
+      const player = new Player(ws, this);
+      ws.send(JSON.stringify({'waiting': this.countWaiting()}));
+    });
+  }
+
+  broadcast(msg) {
+    // notify all clients on server
+    this.clients.forEach(client => {
+        if (client.readyState === ws.OPEN) {
+          client.send(msg);
+        }
+    });
+  }
+
+  countWaiting() {
+    // Count the number of games waiting for a black opponent or white opponent
+
+    let count = { true: 0, false: 0 }
+    for (let g of this.games) {
+      if (g.players[true] === null) {
+        count[true]++;
+      }
+      if (g.players[false] === null) {
+        count[false]++;
+      }
+    }
+    return count;
+  }
+
+  getGame(color) {
+    // try to find a game waiting for that color
+    let game = this.games.find(g => g.players[color] === null);
+    if (!game) {
+      // create a new game if none available
+      game = new Game();
+      game.onEnd = this.gameEnd.bind(this);
+      game.onJoin = this.gameJoin.bind(this);
+      this.games.push(game);
+    }
+    return game;
+  }
+
+  gameEnd(game) {
+    const players = [game.players[true], game.players[false]];
+
+    // close all connections
+    players.filter(p =>
+        p !== null && p.ws.readyState === ws.OPEN
+    ).forEach(p => p.ws.close());
+
+    this.games.splice(this.games.indexOf(game), 1);
+    this.broadcast(JSON.stringify({'waiting': this.countWaiting()}));
+  }
+
+  gameJoin() {
+    this.broadcast(JSON.stringify({'waiting': this.countWaiting()}));
+  }
+}
+
 
 const app = express();
 app.use(express.static(path.join(__dirname, 'build')));
@@ -51,19 +135,4 @@ const options = {
 const server = https.createServer(options, app);
 server.listen(config.port, () => { console.log('listening') });
 
-const game = new Game();
-
-const wss = new ws.Server({ server });
-wss.on('connection', ws => {
-
-  game.addConnection(ws);
-
-  ws.on('message', message => {
-    console.log('received: %s', message);
-  });
-
-  ws.on('close', e => {
-
-  });
-
-});
+new OthelloServer({ server });
