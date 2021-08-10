@@ -29,6 +29,7 @@ class Game {
 
 class Player {
   constructor(ws, server) {
+    this.color = null;
     this.game = null;
 
     this.server = server;
@@ -39,12 +40,23 @@ class Player {
 
       const parsed = JSON.parse(msg);
 
-      // client wants to join a game as a specific color
       if ('joinAs' in parsed) {
+      // client wants to join a game as a specific color
         const color = parsed['joinAs'];
+        this.color = color;
         let game = this.server.getGame(color);
         game.join(this, color);
         this.game = game;
+      }
+
+      if ('move' in parsed) {
+        // client moved, so notify other player of the move
+        const square = parsed['move'];
+        const opponent = this.game.players[!this.color];
+        if (opponent !== null && opponent.ws.readyState === ws.OPEN) {
+          const msg = JSON.stringify({ move: square, player: this.color });
+          this.game.players[!this.color].send(msg);
+        }
       }
     });
 
@@ -54,6 +66,10 @@ class Player {
         this.game = null;
       }
     });
+  }
+
+  send(msg) {
+    this.ws.send(msg);
   }
 }
 

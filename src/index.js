@@ -15,8 +15,8 @@ const ws_port = 10001;
 const ws_url = 'wss://' + loc.hostname + ':' + ws_port + loc.pathname;
 
 class App extends React.Component {
-  constructor() {
-    super();
+  constructor(props) {
+    super(props);
     this.state = {
       selected: false,
       player: null,
@@ -33,13 +33,13 @@ class App extends React.Component {
     ws.onclose = e => {
       console.log(e);
     }
-    ws.onmessage = msg => {
+    ws.addEventListener('message', msg => {
       console.log('message: %s', msg.data);
       const parsed = JSON.parse(msg.data);
       if ('waiting' in parsed) {
         this.setState({ waiting: parsed.waiting });
       }
-    };
+    });
 
     this.selectionMade = this.selectionMade.bind(this);
 
@@ -83,6 +83,7 @@ function Board(props) {
   return <div id="board">{squares}</div>;
 }
 
+
 class Game extends React.Component {
   // A game of Othello.
 
@@ -96,22 +97,26 @@ class Game extends React.Component {
   constructor(props) {
     super(props);
 
-    const squares = Array(BOARDWIDTH * BOARDHEIGHT).fill(null);
+    props.ws.addEventListener('message', msg => {
+      const parsed = JSON.parse(msg.data);
+      if ('move' in parsed && 'player' in parsed) {
+        const square = parsed['move'];
+        const player = parsed['player'];
+        this.setState((state, props) => {
+          if (player === state.player) {
+            return;
+          }
 
-    // Conventional starting state for the board - black and white diagonal to
-    // each other at the center of the board
-    const halfHeight = Math.floor(BOARDHEIGHT / 2);
-    const halfWidth = Math.floor(BOARDWIDTH / 2);
-    const base = (halfHeight - 1) * BOARDWIDTH + halfWidth - 1;
-    squares[base] = false;
-    squares[base + 1] = true;
-    squares[base + BOARDWIDTH] = true;
-    squares[base + BOARDWIDTH + 1] = false;
+          return {
+            squares: move(player, square, state.squares),
+          };
+        });
+      }
+    });
 
     this.state = {
       gameState: STATES.active,
-      score: calcScore(squares),
-      squares,
+      squares: initialSquares(BOARDWIDTH, BOARDHEIGHT),
       turn: true,
     };
   }
@@ -121,23 +126,14 @@ class Game extends React.Component {
       let gameState = state.gameState;
 
       let turn = state.turn;
-
-      let squares = state.squares.slice();
-
-      const captures = getAllCaptures(squareClicked, squares, turn);
-
-      if (squares[squareClicked] !== null || captures.length === 0) {
-        // must be in an unoccupied square and turn some of the opponent's
-        // pieces, or the move is invalid
-        return;
+      if (!turn === props.player && props.player !== null) {
+        // only allow click if it's our turn
+        return {};
       }
 
-      // claim clicked square for the current player
-      squares[squareClicked] = turn;
-
-      // Change the captured squares to the appropriate color
-      for (let c of captures) {
-        squares[c] = turn;
+      const squares = move(state.turn, squareClicked, state.squares);
+      if (squares === null) {
+        return;
       }
 
       const playerCaptures = getMoves(squares, turn);
@@ -151,12 +147,10 @@ class Game extends React.Component {
         gameState = STATES.complete;
       }
 
-      const move = { player: turn, square: squareClicked };
-      props.ws.send(JSON.stringify(move));
+      props.ws.send(JSON.stringify({ move: squareClicked }));
 
       return {
         gameState,
-        score: calcScore(squares),
         squares,
         turn,
       };
@@ -165,11 +159,13 @@ class Game extends React.Component {
 
 
   render() {
+    const score = calcScore(this.state.squares);
+
     let leaderDesc = '\u00A0';
     if (this.state.gameState === STATES.complete) {
-      if (this.state.score[true] > this.state.score[false]) {
+      if (score[true] > score[false]) {
         leaderDesc = 'Black wins!';
-      } else if (this.state.score[true] < this.state.score[false]) {
+      } else if (score[true] < score[false]) {
         leaderDesc = 'White wins!';
       } else {
         leaderDesc = 'It\'s a tie!';
@@ -182,8 +178,8 @@ class Game extends React.Component {
         <div id="gameStats">
           <Square status={this.state.turn} />
           { leaderDesc }
-          Black: {this.state.score[true]} |
-          White: {this.state.score[false]}
+          Black: {score[true]} |
+          White: {score[false]}
         </div>
         <Board
           squares={this.state.squares}
@@ -235,7 +231,7 @@ function calcScore(squares) {
     return score;
 }
 
-function getAllCaptures(position, squares, player) {
+function getAllCaptures(player, position, squares) {
     // If the given "player" (either true, false, or null) places a piece at
     // "position" in the array of "squares", return the element numbers in
     // "squares" that should now be captured.
@@ -320,13 +316,53 @@ function getMoves(squares, player) {
 
   let moves = [];
   for (let i = 0; i < squares.length; i++) {
-     if (squares[i] === null && getAllCaptures(i, squares, player).length > 0) {
+     if (squares[i] === null && getAllCaptures(player, i, squares).length > 0) {
        moves.push(i);
     }
   }
 
   return moves;
 }
+
+function initialSquares(width, height) {
+    const squares = Array(width * height).fill(null);
+
+    // Conventional starting state for the board - black and white diagonal to
+    // each other at the center of the board
+    const halfHeight = Math.floor(height / 2);
+    const halfWidth = Math.floor(width / 2);
+    const base = (halfHeight - 1) * width + halfWidth - 1;
+    squares[base] = false;
+    squares[base + 1] = true;
+    squares[base + width] = true;
+    squares[base + width + 1] = false;
+
+    return squares;
+}
+
+function move(player, square, squares) {
+  squares = squares.slice();
+
+  const captures = getAllCaptures(player, square, squares);
+
+  if (squares[square] !== null || captures.length === 0) {
+    // must be in an unoccupied square and switch some of the opponent's
+    // pieces, or the move is invalid
+    return null;
+  }
+
+  // claim clicked square for the current player
+  squares[square] = player;
+
+  // Change the captured squares to the appropriate color
+  for (let c of captures) {
+    squares[c] = player;
+  }
+
+  return squares;
+}
+
+
 
 
 ReactDOM.render(
