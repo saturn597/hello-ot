@@ -49,7 +49,7 @@ class Player {
         this.game = game;
       }
 
-      if ('move' in parsed) {
+      if ('move' in parsed && this.game) {
         // client moved, so notify other player of the move
         const square = parsed['move'];
         const opponent = this.game.players[!this.color];
