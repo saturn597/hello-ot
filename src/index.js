@@ -91,8 +91,11 @@ class Game extends React.Component {
   constructor(props) {
     super(props);
 
+    const os = OthelloState.initialState(BOARDWIDTH, BOARDHEIGHT);
     this.state = {
-      os: OthelloState.initialState(BOARDWIDTH, BOARDHEIGHT),
+      os,
+      history: [os],
+      historyIndex: 0,
     };
 
     props.ws.addEventListener('message', msg => {
@@ -107,6 +110,16 @@ class Game extends React.Component {
           };
         });
       }
+    });
+
+    this.advanceState = this.advanceState.bind(this);
+  }
+
+  advanceState(change) {
+    this.setState((state, props) => {
+      const historyIndex = state.historyIndex + change;
+      const os = state.history[historyIndex];
+      return { os, historyIndex };
     });
   }
 
@@ -125,12 +138,15 @@ class Game extends React.Component {
         return null;
       }
 
+      const historyIndex = state.historyIndex + 1;
+      const history = state.history.slice(0, historyIndex);
+      history.push(os);
+
       props.ws.send(JSON.stringify({ move: square }));
 
-      return { os };
+      return { os, history, historyIndex };
     });
   }
-
 
   render() {
     const score = this.state.os.getScore();
@@ -148,6 +164,9 @@ class Game extends React.Component {
       }
     }
 
+    const offline = this.props.player === null;
+    const allowUndo = this.state.historyIndex > 0;
+    const allowRedo = this.state.historyIndex < this.state.history.length - 1;
     return (
       <div id="main">
         <div id="gameStats">
@@ -160,6 +179,13 @@ class Game extends React.Component {
           squares={this.state.os.squares}
           onClick={i => this.handleClick(i)}
         />
+        {offline &&
+            <UndoRedo
+              allowUndo={allowUndo}
+              allowRedo={allowRedo}
+              advanceState={this.advanceState}
+            />
+        }
       </div>
     );
   }
@@ -193,6 +219,23 @@ function Square(props) {
     <button className="square" onClick={props.onClick}>
       <div className={color}></div>
     </button>
+  );
+}
+
+function UndoRedo(props) {
+  return (
+    <div>
+      <button
+        onClick={() => props.advanceState(-1)}
+        disabled={!props.allowUndo}>
+        Undo
+      </button>
+      <button
+        onClick={() => props.advanceState(1)}
+        disabled={!props.allowRedo}>
+        Redo
+      </button>
+    </div>
   );
 }
 
