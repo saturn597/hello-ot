@@ -72,19 +72,6 @@ class App extends React.Component {
 }
 
 
-function Board(props) {
-  const squares = props.squares.map((sq, i) =>
-    <Square
-      key={i}
-      onClick={() => props.onClick(i)}
-      status={sq}
-     >
-    </Square>
-  );
-  return <div id="board">{squares}</div>;
-}
-
-
 class Game extends React.Component {
   // A React game of Othello.
 
@@ -151,44 +138,55 @@ class Game extends React.Component {
   render() {
     const score = this.state.os.getScore();
 
-    // description of who has won - default to non-breaking space
-    let winnerText = '\u00A0';
-
-    if (this.state.os.gameOver === true) {
-      if (score[true] > score[false]) {
-        winnerText = 'Black wins!';
-      } else if (score[true] < score[false]) {
-        winnerText = 'White wins!';
-      } else {
-        winnerText = 'It\'s a tie!';
-      }
-    }
-
-    const offline = this.props.player === null;
+    const online = this.props.player !== null;
     const allowUndo = this.state.historyIndex > 0;
     const allowRedo = this.state.historyIndex < this.state.history.length - 1;
+
     return (
       <div id="main">
-        <div id="gameStats">
-          <Square status={this.state.os.currentPlayer} />
-          <div>{ winnerText }</div>
-          Black: {score[true]} |
-          White: {score[false]}
-        </div>
         <Board
           squares={this.state.os.squares}
           onClick={i => this.handleClick(i)}
         />
-        {offline &&
+        <div id="hud">
+          <ScoreDisplay score={score} />
+          <TurnIndicator
+            online={online}
+            player={this.props.player}
+            turn={this.state.os.currentPlayer}
+          />
+          {!online &&
             <UndoRedo
               allowUndo={allowUndo}
               allowRedo={allowRedo}
               advanceState={this.advanceState}
             />
-        }
+          }
+          {this.state.os.gameOver && <Winner score={score} />}
+        </div>
+
       </div>
     );
   }
+}
+
+
+function Board(props) {
+  const squares = props.squares.map((sq, i) =>
+    <Square
+      key={i}
+      onClick={() => props.onClick(i)}
+      status={sq}
+     >
+    </Square>
+  );
+  return <div id="board">{squares}</div>;
+}
+
+function PlayerChip(props) {
+  return props.player ?
+    <span className="blackChip">Black</span> :
+    <span className="whiteChip">White</span>;
 }
 
 function GameSelection(props) {
@@ -209,6 +207,25 @@ function GameSelection(props) {
   );
 }
 
+function ScoreDisplay(props) {
+  return (
+    <div id="scoreDisplay">
+      <div className="scoreSection" id="blackScore">
+        <span className="scoreLabel">Black</span>
+        <div>
+          { props.score[true] }
+        </div>
+      </div>
+      <div className="scoreSection" id="whiteScore">
+        <span className="scoreLabel">White</span>
+        <div>
+          { props.score[false] }
+        </div>
+      </div>
+    </div>
+  );
+}
+
 function Square(props) {
   let color = 'blank';
   if (props.status !== null) {
@@ -220,6 +237,30 @@ function Square(props) {
       <div className={color}></div>
     </button>
   );
+}
+
+function TurnIndicator(props) {
+
+  const playingAs = <PlayerChip player={props.player} />;
+  const turn = <PlayerChip player={props.turn} />;
+
+  return (
+    <div>
+      <div className="turnSummary">
+        {props.online && <div>You are playing as: {playingAs}</div>}
+        <div>Next move: {turn}</div>
+      </div>
+      {props.online &&
+        <strong>
+          { props.player === props.turn ?
+            'Your move!' :
+            'Wait...'
+          }
+        </strong>
+      }
+    </div>
+  );
+
 }
 
 function UndoRedo(props) {
@@ -237,6 +278,19 @@ function UndoRedo(props) {
       </button>
     </div>
   );
+}
+
+function Winner(props) {
+  const score = props.score;
+
+  let winnerText = 'It\'s a tie!';
+  if (score[true] > score[false]) {
+    winnerText = 'Black wins!';
+  } else if (score[true] < score[false]) {
+    winnerText = 'White wins!';
+  }
+
+  return <div id="winnerText">{winnerText}</div>;
 }
 
 

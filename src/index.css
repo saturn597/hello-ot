@@ -3,16 +3,17 @@ body {
 }
 
 #board {
-  display: flex;
+  display: inline-flex;
   flex-direction: row;
   flex-wrap: wrap;
+  vertical-align: top;
   width: 408px;
 }
 
 .square {
   align-items: center;
   justify-content: center;
-  background-color: ForestGreen;
+  background-color: #55af55;
   border: 1px solid black;
   display: flex;
   margin-left: -1px;
@@ -36,4 +37,63 @@ body {
 
 .white {
   background-color: white;
+}
+
+#hud {
+  display: inline-block;
+  line-height: 2;
+  margin-left: 20px;
+  margin-bottom: 20px;
+  padding: 10px;
+}
+
+.blackChip, .whiteChip {
+  border: 1px solid black;
+  border-radius: 20%;
+  display: inline-block;
+  font-weight: bold;
+  padding: 0 6px;
+}
+
+.blackChip {
+  background-color: black;
+  color: white;
+}
+
+.whiteChip {
+  background-color: white;
+  color: black;
+}
+
+.scoreSection {
+  border: 1px solid black;
+  display: inline-block;
+  margin-right: 5px;
+  width: 4em;
+}
+
+.scoreSection div {
+  font-size: 2em;
+  text-align: center;
+}
+
+.scoreLabel {
+  border-bottom: 1px solid black;
+  display: inline-block;
+  text-align: center;
+  width: 100%;
+}
+
+#blackScore {
+  background-color: black;
+  color: white;
+}
+
+#blackScore .scoreLabel {
+  border-color: white;
+}
+
+#winnerText {
+  font-weight: bold;
+  font-size: 1.25em;
 }
