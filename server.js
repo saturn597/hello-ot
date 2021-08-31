@@ -7,6 +7,14 @@ const path = require('path');
 const ws = require('ws');
 
 
+const gameAbortedReasons = {
+  // TODO: share code between client and server
+  opponentDisconnect: 'opponentDisconnect',
+  opponentLeft: 'opponentLeft',
+  serverConnectionLost: 'serverConnectionLost',
+};
+
+
 class Game {
   constructor() {
     // "true" plays as black, "false" plays as white
@@ -16,13 +24,19 @@ class Game {
     this.onEnd = () => {};
   }
 
+  getActivePlayers() {
+    return [this.players[true], this.players[false]].filter(p =>
+      p !== null && p.ws.readyState === ws.OPEN);
+  }
+
   join(player, color) {
     this.players[color] = player;
+
     this.onJoin();
   }
 
-  end() {
-    this.onEnd(this);
+  end(reason) {
+    this.onEnd(this, reason);
   }
 }
 
@@ -41,35 +55,66 @@ class Player {
       const parsed = JSON.parse(msg);
 
       if ('joinAs' in parsed) {
-      // client wants to join a game as a specific color
+        // client wants to join a game as a specific color
         const color = parsed['joinAs'];
         this.color = color;
         let game = this.server.getGame(color);
         game.join(this, color);
         this.game = game;
+
+        // update both players about whether they have an active opponent
+        this.sendJson(
+          { opponentConnected: this.getActiveOpponent() !== null });
+        this.sendOpponent({ opponentConnected: true });
       }
 
       if ('move' in parsed && this.game) {
         // client moved, so notify other player of the move
         const square = parsed['move'];
-        const opponent = this.game.players[!this.color];
-        if (opponent !== null && opponent.ws.readyState === ws.OPEN) {
-          const msg = JSON.stringify({ move: square, player: this.color });
-          this.game.players[!this.color].send(msg);
-        }
+        this.sendOpponent({ move: square, player: this.color });
+      }
+
+      if ('endGame' in parsed) {
+        this.leaveGame(gameAbortedReasons.opponentLeft);
       }
     });
 
     ws.on('close', e => {
-      if (this.game !== null) {
-        this.game.end();
-        this.game = null;
-      }
+      this.leaveGame(gameAbortedReasons.opponentDisconnect);
     });
   }
 
-  send(msg) {
-    this.ws.send(msg);
+  getActiveOpponent() {
+    // returns opposing player if they are connected, otherwise returns null
+    const opponent = this.game.players[!this.color];
+    if (opponent !== null && opponent.ws.readyState === ws.OPEN) {
+      return opponent;
+    }
+    return null;
+  }
+
+  leaveGame(reason) {
+    if (this.game !== null) {
+      this.game.players[this.color] = null;
+      this.sendOpponent({ opponentConnected: false });
+      this.game.end(reason);
+      this.game = null;
+    }
+  }
+
+  sendJson(msg) {
+    this.ws.send(JSON.stringify(msg));
+  }
+
+  sendOpponent(msg) {
+    // If opponent is connected, send a JSON encoded message to them and return
+    // true. Otherwise, do nothing and return false.
+    const opponent = this.getActiveOpponent();
+    if (opponent !== null) {
+      opponent.sendJson(msg);
+      return true;
+    }
+    return false;
   }
 }
 
@@ -123,15 +168,18 @@ class OthelloServer extends ws.Server {
     return game;
   }
 
-  gameEnd(game) {
-    const players = [game.players[true], game.players[false]];
+  gameEnd(game, reason) {
 
-    // close all connections
-    players.filter(p =>
-        p !== null && p.ws.readyState === ws.OPEN
-    ).forEach(p => p.ws.close());
+    // Remove game from our list of games if present
+    const index = this.games.indexOf(game);
+    if (index >= 0) {
+      this.games.splice(this.games.indexOf(game), 1);
+    }
 
-    this.games.splice(this.games.indexOf(game), 1);
+    game.getActivePlayers().forEach(p => {
+      p.sendJson({ gameEnd: reason });
+    });
+
     this.broadcast(JSON.stringify({'waiting': this.countWaiting()}));
   }
 

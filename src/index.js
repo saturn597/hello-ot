@@ -12,6 +12,13 @@ const ws_port = 10001;
 const ws_url = 'wss://' + loc.hostname + ':' + ws_port + loc.pathname;
 
 
+const gameAbortedReasons = {
+  opponentDisconnect: 'opponentDisconnect',
+  opponentLeft: 'opponentLeft',
+  serverConnectionLost: 'serverConnectionLost',
+};
+
+
 class App extends React.Component {
   constructor(props) {
     super(props);
@@ -21,15 +28,15 @@ class App extends React.Component {
       waiting: { true: 0, false: 0 },  // # games awaiting a given color
       ws: null,
     };
+
+    this.endGame = this.endGame.bind(this);
+    this.selectionMade = this.selectionMade.bind(this);
   }
 
   componentDidMount() {
     const ws = new WebSocket(ws_url);
 
     ws.onerror = e => {
-      console.log(e);
-    }
-    ws.onclose = e => {
       console.log(e);
     }
 
@@ -41,15 +48,26 @@ class App extends React.Component {
       }
     });
 
-    this.selectionMade = this.selectionMade.bind(this);
+    ws.addEventListener('close', e => {
+      // TODO: try to reconnect
+      console.log('websocket closed');
+      this.setState({ ws: null });
+    });
 
     this.setState({ ws });
+  }
+
+  endGame() {
+    this.setState({
+      selected: false,
+      player: null,
+    });
   }
 
   selectionMade(selection) {
     // Player selected the color they want to play as
     const ws = this.state.ws;
-    if (selection !== null && ws.readyState === WebSocket.OPEN) {
+    if (selection !== null && ws && ws.readyState === WebSocket.OPEN) {
       ws.send(JSON.stringify({ joinAs: selection }));
     }
     this.setState({
@@ -59,15 +77,24 @@ class App extends React.Component {
   }
 
   render() {
+    const connected = this.state.ws !== null;
+
     if (!this.state.selected) {
       return (
         <GameSelection
+          connected={connected}
           selectionMade={this.selectionMade}
           waiting={this.state.waiting}
         />
       );
     }
-    return <Game ws={this.state.ws} player={this.state.player}/>;
+    return (
+      <Game
+        onEnd={this.endGame}
+        player={this.state.player}
+        ws={this.state.ws}
+      />
+    );
   }
 }
 
@@ -80,26 +107,67 @@ class Game extends React.Component {
 
     const os = OthelloState.initialState(BOARDWIDTH, BOARDHEIGHT);
     this.state = {
-      os,
+      gameAborted: false,
       history: [os],
       historyIndex: 0,
+      opponentConnected: false,
+      os,
     };
 
-    props.ws.addEventListener('message', msg => {
-      const parsed = JSON.parse(msg.data);
-      if ('move' in parsed) {
-        // server is saying our opponent moved
-        const square = parsed['move'];
-
-        this.setState((state, props) => {
-          return {
-            os: state.os.move(square),
-          };
+    if (props.ws) {
+      props.ws.addEventListener('close', e => {
+        this.setState({
+          gameAborted: gameAbortedReasons.serverConnectionLost,
         });
-      }
-    });
+      });
+
+      props.ws.addEventListener('message', msg => {
+        const parsed = JSON.parse(msg.data);
+        if ('move' in parsed) {
+          // server is saying our opponent moved
+          const square = parsed['move'];
+
+          this.setState((state, props) => {
+            return {
+              os: state.os.move(square),
+            };
+          });
+        }
+
+        if ('opponentConnected' in parsed) {
+          this.setState({ opponentConnected: parsed['opponentConnected'] });
+        }
+
+        if ('gameEnd' in parsed) {
+          const reason = parsed['gameEnd'];
+          this.setState({
+            gameAborted: gameAbortedReasons[reason],
+          });
+        }
+      });
+    }
 
     this.advanceState = this.advanceState.bind(this);
+    this.endGame = this.endGame.bind(this);
+  }
+
+  acceptingClicks() {
+    // Determine whether our board should accept clicks
+
+    const props = this.props;
+    const state = this.state;
+
+    // Accept clicks if props.player is unset, in which case we know we're
+    // offline. Also accept clicks if we're playing online and it's our turn
+    // and the game hasn't been aborted and our opponent is connected.
+    const gameAborted = state.gameAborted;
+    const gameOver = state.os.gameOver;
+    const opponentConnected = state.opponentConnected;
+    const ourTurn = state.os.currentPlayer === props.player;
+    const playingOffline = props.player === null;
+
+    return playingOffline ||
+      (ourTurn && !gameAborted && !gameOver && opponentConnected);
   }
 
   advanceState(change) {
@@ -110,12 +178,21 @@ class Game extends React.Component {
     });
   }
 
+  endGame() {
+    const netplay = this.props.player !== null;
+    const open = this.props.ws && this.props.ws.readyState === WebSocket.OPEN;
+
+    if (netplay && open) {
+      this.props.ws.send(JSON.stringify({ 'endGame': true }));
+    }
+    this.props.onEnd();
+  }
+
   handleClick(square) {
     // mouse was clicked in a given square
 
     this.setState((state, props) => {
-      if (!state.os.currentPlayer === props.player && props.player !== null) {
-        // only allow move if it's our turn
+      if (!this.acceptingClicks()) {
         return null;
       }
 
@@ -129,7 +206,9 @@ class Game extends React.Component {
       const history = state.history.slice(0, historyIndex);
       history.push(os);
 
-      props.ws.send(JSON.stringify({ move: square }));
+      if (this.props.player !== null) {
+        props.ws.send(JSON.stringify({ move: square }));
+      }
 
       return { os, history, historyIndex };
     });
@@ -145,6 +224,7 @@ class Game extends React.Component {
     return (
       <div id="main">
         <Board
+          enabled={this.acceptingClicks()}
           squares={this.state.os.squares}
           onClick={i => this.handleClick(i)}
         />
@@ -155,6 +235,15 @@ class Game extends React.Component {
             player={this.props.player}
             turn={this.state.os.currentPlayer}
           />
+          {online &&
+            <Instructions
+              gameAborted={this.state.gameAborted}
+              os={this.state.os}
+              opponentConnected={this.state.opponentConnected}
+              player={this.props.player}
+              turn={this.state.os.currentPlayer}
+            />
+          }
           {!online &&
             <UndoRedo
               allowUndo={allowUndo}
@@ -162,7 +251,7 @@ class Game extends React.Component {
               advanceState={this.advanceState}
             />
           }
-          {this.state.os.gameOver && <Winner score={score} />}
+          <button onClick={this.endGame}>End game</button>
         </div>
 
       </div>
@@ -180,7 +269,8 @@ function Board(props) {
      >
     </Square>
   );
-  return <div id="board">{squares}</div>;
+  const className = props.enabled ? 'enabled' : 'disabled';
+  return <div id="board" className={className}>{squares}</div>;
 }
 
 function PlayerChip(props) {
@@ -194,10 +284,16 @@ function GameSelection(props) {
   const f = props.waiting[false];
   return (
     <div>
-      <button onClick={() => props.selectionMade(true)}>
+      <button
+        disabled={!props.connected}
+        onClick={() => props.selectionMade(true)}
+      >
         Play as black { t > 0 ? '(' + t + ')' : '' }
       </button>
-      <button onClick={() => props.selectionMade(false)}>
+      <button
+        disabled={!props.connected}
+        onClick={() => props.selectionMade(false)}
+      >
         Play as white { f > 0 ? '(' + f + ')' : ''}
       </button>
       <button onClick={() => props.selectionMade(null)}>
@@ -250,17 +346,41 @@ function TurnIndicator(props) {
         {props.online && <div>You are playing as: {playingAs}</div>}
         <div>Next move: {turn}</div>
       </div>
-      {props.online &&
-        <strong>
-          { props.player === props.turn ?
-            'Your move!' :
-            'Wait...'
-          }
-        </strong>
-      }
     </div>
   );
 
+}
+
+function Instructions(props) {
+  let instructions = 'Your move!';
+  if (props.player !== props.turn) {
+    instructions = 'Wait...';
+  }
+  if (!props.opponentConnected) {
+    instructions = 'Waiting for opponent to join...';
+  }
+
+  if (props.gameAborted === gameAbortedReasons.opponentDisconnect) {
+    instructions = 'Game over! Opponent disconnected.';
+  }
+  if (props.gameAborted === gameAbortedReasons.serverConnectionLost) {
+    instructions = 'Game over! Lost server connection.';
+  }
+  if (props.gameAborted === gameAbortedReasons.opponentLeft) {
+    instructions = 'Game over! Opponent left.';
+  }
+
+  if (props.os.gameOver) {
+    instructions = <Winner score={props.os.getScore()} />;
+  }
+
+  return (
+    <div>
+      <strong>
+        { instructions }
+      </strong>
+    </div>
+  );
 }
 
 function UndoRedo(props) {

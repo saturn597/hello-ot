@@ -10,6 +10,10 @@ body {
   width: 408px;
 }
 
+.disabled {
+  opacity: 0.5;
+}
+
 .square {
   align-items: center;
   justify-content: center;
@@ -91,9 +95,4 @@ body {
 
 #blackScore .scoreLabel {
   border-color: white;
-}
-
-#winnerText {
-  font-weight: bold;
-  font-size: 1.25em;
 }
