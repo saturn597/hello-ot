@@ -81,11 +81,25 @@ class App extends React.Component {
 
     if (!this.state.selected) {
       return (
-        <GameSelection
-          connected={connected}
-          selectionMade={this.selectionMade}
-          waiting={this.state.waiting}
-        />
+        <div id="gameSelection">
+          <GameSelection
+            connected={connected}
+            selectionMade={this.selectionMade}
+            waiting={this.state.waiting}
+          />
+          <p>
+            <a href="https://en.wikipedia.org/wiki/Reversi">
+              How to play
+            </a>
+          </p>
+          <p>
+            Select "play as black" or "play as white" to play online as the
+            given color. If no one else is waiting, you may have to wait for an
+            opponent.  If you're not looking to play with someone else online,
+            you can select "play offline" to play as both black and white from
+            a single screen and have access to undo and redo buttons.
+          </p>
+        </div>
       );
     }
     return (
@@ -288,13 +302,13 @@ function GameSelection(props) {
         disabled={!props.connected}
         onClick={() => props.selectionMade(true)}
       >
-        Play as black { t > 0 ? '(' + t + ')' : '' }
+        Play as black { '(' + t + ' waiting)' }
       </button>
       <button
         disabled={!props.connected}
         onClick={() => props.selectionMade(false)}
       >
-        Play as white { f > 0 ? '(' + f + ')' : ''}
+        Play as white { '(' + f + ' waiting)' }
       </button>
       <button onClick={() => props.selectionMade(null)}>
         Play offline

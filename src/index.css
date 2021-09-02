@@ -96,3 +96,27 @@ body {
 #blackScore .scoreLabel {
   border-color: white;
 }
+
+#gameSelection {
+  margin: 0 auto;
+  text-align: center;
+  width: 60%;
+}
+
+#gameSelection button {
+  background-color: white;
+  border: 2px outset #aaaaaa;
+  border-radius: 5%;
+  color: black;
+  margin: 2%;
+  padding: 5%;
+}
+
+#gameSelection button:hover {
+  background-color: #efefef;
+}
+
+#gameSelection button:focus {
+  background-color: #dddddd;
+  border-style: inset;
+}
