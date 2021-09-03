@@ -4,8 +4,13 @@ import ReactDOM from 'react-dom';
 import './index.css';
 import OthelloState from './othellostate.js';
 
-const BOARDWIDTH = 8;
-const BOARDHEIGHT = 8;
+// width and height of board in number of squares
+const BOARDWIDTH = 4;
+const BOARDHEIGHT = 4;
+
+// width and height of squares in pixels
+const SQUAREWIDTH = 52;
+const SQUAREHEIGHT = 52;
 
 const loc = window.location;
 const ws_port = 10001;
@@ -104,6 +109,8 @@ class App extends React.Component {
     }
     return (
       <Game
+        width={BOARDWIDTH}
+        height={BOARDHEIGHT}
         onEnd={this.endGame}
         player={this.state.player}
         ws={this.state.ws}
@@ -119,7 +126,7 @@ class Game extends React.Component {
   constructor(props) {
     super(props);
 
-    const os = OthelloState.initialState(BOARDWIDTH, BOARDHEIGHT);
+    const os = OthelloState.initialState(this.props.width, this.props.height);
     this.state = {
       gameAborted: false,
       history: [os],
@@ -241,6 +248,7 @@ class Game extends React.Component {
           enabled={this.acceptingClicks()}
           squares={this.state.os.squares}
           onClick={i => this.handleClick(i)}
+          width={this.props.width}
         />
         <div id="hud">
           <ScoreDisplay score={score} />
@@ -275,6 +283,7 @@ class Game extends React.Component {
 
 
 function Board(props) {
+  const style = { width: (props.width * (SQUAREWIDTH - 1)) + 'px' };
   const squares = props.squares.map((sq, i) =>
     <Square
       key={i}
@@ -284,7 +293,11 @@ function Board(props) {
     </Square>
   );
   const className = props.enabled ? 'enabled' : 'disabled';
-  return <div id="board" className={className}>{squares}</div>;
+  return (
+    <div id="board" className={className} style={ style }>
+      {squares}
+    </div>
+  )
 }
 
 function PlayerChip(props) {
@@ -337,13 +350,18 @@ function ScoreDisplay(props) {
 }
 
 function Square(props) {
+  const style = {
+    width: SQUAREWIDTH + 'px',
+    height: SQUAREHEIGHT + 'px',
+  };
+
   let color = 'blank';
   if (props.status !== null) {
     color = props.status ? 'black' : 'white';
   }
 
   return (
-    <button className="square" onClick={props.onClick}>
+    <button className="square" onClick={props.onClick} style={style}>
       <div className={color}></div>
     </button>
   );

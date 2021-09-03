@@ -7,7 +7,6 @@ body {
   flex-direction: row;
   flex-wrap: wrap;
   vertical-align: top;
-  width: 408px;
 }
 
 .disabled {
