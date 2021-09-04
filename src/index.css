@@ -111,11 +111,15 @@ body {
   padding: 5%;
 }
 
-#gameSelection button:hover {
+#gameSelection button:hover:enabled {
   background-color: #efefef;
 }
 
 #gameSelection button:focus {
   background-color: #dddddd;
   border-style: inset;
+}
+
+#gameSelection button:disabled {
+  opacity: 0.5;
 }

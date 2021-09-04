@@ -92,6 +92,7 @@ class App extends React.Component {
             selectionMade={this.selectionMade}
             waiting={this.state.waiting}
           />
+          { !connected && <p><strong>No server connection!</strong></p> }
           <p>
             <a href="https://en.wikipedia.org/wiki/Reversi">
               How to play
@@ -137,9 +138,14 @@ class Game extends React.Component {
 
     if (props.ws) {
       props.ws.addEventListener('close', e => {
-        this.setState({
-          gameAborted: gameAbortedReasons.serverConnectionLost,
-        });
+        this.setState((state, props) => {
+          if (props.player === null) {
+            return null;
+          }
+          return {
+            gameAborted: gameAbortedReasons.serverConnectionLost,
+          };
+        })
       });
 
       props.ws.addEventListener('message', msg => {
@@ -178,17 +184,12 @@ class Game extends React.Component {
     const props = this.props;
     const state = this.state;
 
-    // Accept clicks if props.player is unset, in which case we know we're
-    // offline. Also accept clicks if we're playing online and it's our turn
-    // and the game hasn't been aborted and our opponent is connected.
-    const gameAborted = state.gameAborted;
-    const gameOver = state.os.gameOver;
-    const opponentConnected = state.opponentConnected;
-    const ourTurn = state.os.currentPlayer === props.player;
+    const gameOngoing = !state.gameAborted && !state.os.gameOver;
+    const ourTurn = state.opponentConnected &&
+      state.os.currentPlayer === props.player;
     const playingOffline = props.player === null;
 
-    return playingOffline ||
-      (ourTurn && !gameAborted && !gameOver && opponentConnected);
+    return gameOngoing && (ourTurn || playingOffline);
   }
 
   advanceState(change) {
@@ -257,15 +258,13 @@ class Game extends React.Component {
             player={this.props.player}
             turn={this.state.os.currentPlayer}
           />
-          {online &&
-            <Instructions
-              gameAborted={this.state.gameAborted}
-              os={this.state.os}
-              opponentConnected={this.state.opponentConnected}
-              player={this.props.player}
-              turn={this.state.os.currentPlayer}
-            />
-          }
+          <Instructions
+            gameAborted={this.state.gameAborted}
+            os={this.state.os}
+            opponentConnected={this.state.opponentConnected}
+            player={this.props.player}
+            turn={this.state.os.currentPlayer}
+          />
           {!online &&
             <UndoRedo
               allowUndo={allowUndo}
@@ -385,6 +384,7 @@ function TurnIndicator(props) {
 
 function Instructions(props) {
   let instructions = 'Your move!';
+
   if (props.player !== props.turn) {
     instructions = 'Wait...';
   }
@@ -404,6 +404,8 @@ function Instructions(props) {
 
   if (props.os.gameOver) {
     instructions = <Winner score={props.os.getScore()} />;
+  } else if (props.player === null) {
+    instructions = "Playing offline";
   }
 
   return (
