@@ -36,6 +36,9 @@ class App extends React.Component {
 
     this.endGame = this.endGame.bind(this);
     this.selectionMade = this.selectionMade.bind(this);
+
+    this.socketClosed = this.socketClosed.bind(this);
+    this.socketMessage = this.socketMessage.bind(this);
   }
 
   componentDidMount() {
@@ -45,21 +48,17 @@ class App extends React.Component {
       console.log(e);
     }
 
-    ws.addEventListener('message', msg => {
-      console.log('message: %s', msg.data);
-      const parsed = JSON.parse(msg.data);
-      if ('waiting' in parsed) {
-        this.setState({ waiting: parsed.waiting });
-      }
-    });
-
-    ws.addEventListener('close', e => {
-      // TODO: try to reconnect
-      console.log('websocket closed');
-      this.setState({ ws: null });
-    });
+    ws.addEventListener('message', this.socketMessage);
+    ws.addEventListener('close', this.socketClosed);
 
     this.setState({ ws });
+  }
+
+  componentWillUnmount() {
+    if (this.props.ws) {
+      this.props.ws.removeEventListener('close', this.socketClosed);
+      this.props.ws.removeEventListener('message', this.socketMessage);
+    }
   }
 
   endGame() {
@@ -79,6 +78,20 @@ class App extends React.Component {
       player: selection,
       selected: true,
     });
+  }
+
+  socketClosed() {
+    // TODO: try to reconnect
+    console.log('websocket closed');
+    this.setState({ ws: null });
+  }
+
+  socketMessage(msg) {
+    console.log('message: %s', msg.data);
+    const parsed = JSON.parse(msg.data);
+    if ('waiting' in parsed) {
+      this.setState({ waiting: parsed.waiting });
+    }
   }
 
   render() {
@@ -108,13 +121,17 @@ class App extends React.Component {
         </div>
       );
     }
+
+    // Game doesn't need websocket if we're playing offline
+    const ws = this.state.player === null ? null : this.state.ws;
+
     return (
       <Game
         width={BOARDWIDTH}
         height={BOARDHEIGHT}
         onEnd={this.endGame}
         player={this.state.player}
-        ws={this.state.ws}
+        ws={ws}
       />
     );
   }
@@ -127,6 +144,11 @@ class Game extends React.Component {
   constructor(props) {
     super(props);
 
+    this.advanceState = this.advanceState.bind(this);
+    this.endGame = this.endGame.bind(this);
+    this.socketClosed = this.socketClosed.bind(this);
+    this.socketMessage = this.socketMessage.bind(this);
+
     const os = OthelloState.initialState(this.props.width, this.props.height);
     this.state = {
       gameAborted: false,
@@ -137,45 +159,16 @@ class Game extends React.Component {
     };
 
     if (props.ws) {
-      props.ws.addEventListener('close', e => {
-        this.setState((state, props) => {
-          if (props.player === null) {
-            return null;
-          }
-          return {
-            gameAborted: gameAbortedReasons.serverConnectionLost,
-          };
-        })
-      });
-
-      props.ws.addEventListener('message', msg => {
-        const parsed = JSON.parse(msg.data);
-        if ('move' in parsed) {
-          // server is saying our opponent moved
-          const square = parsed['move'];
-
-          this.setState((state, props) => {
-            return {
-              os: state.os.move(square),
-            };
-          });
-        }
-
-        if ('opponentConnected' in parsed) {
-          this.setState({ opponentConnected: parsed['opponentConnected'] });
-        }
-
-        if ('gameEnd' in parsed) {
-          const reason = parsed['gameEnd'];
-          this.setState({
-            gameAborted: gameAbortedReasons[reason],
-          });
-        }
-      });
+      props.ws.addEventListener('close', this.socketClosed);
+      props.ws.addEventListener('message', this.socketMessage);
     }
+  }
 
-    this.advanceState = this.advanceState.bind(this);
-    this.endGame = this.endGame.bind(this);
+  componentWillUnmount() {
+    if (this.props.ws) {
+      this.props.ws.removeEventListener('close', this.socketClosed);
+      this.props.ws.removeEventListener('message', this.socketMessage);
+    }
   }
 
   acceptingClicks() {
@@ -234,6 +227,42 @@ class Game extends React.Component {
 
       return { os, history, historyIndex };
     });
+  }
+
+  socketClosed(e) {
+    this.setState((state, props) => {
+      if (props.player === null) {
+        return null;
+      }
+      return {
+        gameAborted: gameAbortedReasons.serverConnectionLost,
+      };
+    })
+  }
+
+  socketMessage(msg) {
+    const parsed = JSON.parse(msg.data);
+    if ('move' in parsed) {
+      // server is saying our opponent moved
+      const square = parsed['move'];
+
+      this.setState((state, props) => {
+        return {
+          os: state.os.move(square),
+        };
+      });
+    }
+
+    if ('opponentConnected' in parsed) {
+      this.setState({ opponentConnected: parsed['opponentConnected'] });
+    }
+
+    if ('gameEnd' in parsed) {
+      const reason = parsed['gameEnd'];
+      this.setState({
+        gameAborted: gameAbortedReasons[reason],
+      });
+    }
   }
 
   render() {

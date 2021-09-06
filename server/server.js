@@ -23,8 +23,6 @@ class Game {
 
     this.onJoin = () => {};
     this.onEnd = () => {};
-
-    const os = OthelloState.initialState(4, 4);
   }
 
   getActivePlayers() {
