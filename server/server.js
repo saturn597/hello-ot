@@ -1,11 +1,12 @@
-const config = require('./config.js');
+import express from 'express';
+import fs from 'fs';
+import https from 'https';
+import path from 'path';
+import ws from 'ws';
 
-const express = require('express');
-const fs = require('fs');
-const https = require('https');
-const path = require('path');
-const ws = require('ws');
+import config from './config.js';
 
+import OthelloState from '../src/othellostate.js';
 
 const gameAbortedReasons = {
   // TODO: share code between client and server
@@ -22,6 +23,8 @@ class Game {
 
     this.onJoin = () => {};
     this.onEnd = () => {};
+
+    const os = OthelloState.initialState(4, 4);
   }
 
   getActivePlayers() {
@@ -190,7 +193,7 @@ class OthelloServer extends ws.Server {
 
 
 const app = express();
-app.use(express.static(path.join(__dirname, 'build')));
+app.use(express.static(config.buildPath));
 
 const options = {
   cert: fs.readFileSync(config.sslCertPath),
