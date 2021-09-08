@@ -23,6 +23,8 @@ class Game {
 
     this.onJoin = () => {};
     this.onEnd = () => {};
+
+    this.os = OthelloState.initialState(4, 4);
   }
 
   getActivePlayers() {
@@ -30,14 +32,52 @@ class Game {
       p !== null && p.ws.readyState === ws.OPEN);
   }
 
-  join(player, color) {
-    this.players[color] = player;
-
-    this.onJoin();
+  colorConnected(color) {
+    const p = this.players[color];
+    return p !== null && p.ws.readyState === ws.OPEN;
   }
 
   end(reason) {
     this.onEnd(this, reason);
+  }
+
+  join(player, color) {
+    this.players[color] = player;
+
+    // update both players about whether they have an active opponent
+    this.sendPlayerJson(color,
+      { opponentConnected: this.colorConnected(!color) });
+    this.sendPlayerJson(!color, { opponentConnected: true });
+
+    this.onJoin();
+  }
+
+  leaveGame(color, reason) {
+    this.players[color] = null;
+    this.sendPlayerJson(!color, { opponentConnected: false });
+    this.end(reason);
+  }
+
+  move(color, square) {
+    if (color !== this.os.currentPlayer) {
+      console.log('wrong color: ' + color);
+      return;
+    }
+    const newState = this.os.move(square);
+    if (newState !== null) {
+      // os.move will return null if move is invalid
+      this.os = newState;
+      this.sendPlayerJson(!color, { move: square, player: color });
+    } else {
+      console.log('invalid move: ' + square);
+    }
+  }
+
+  sendPlayerJson(color, message) {
+    const p = this.players[color];
+    if (p && p.ws.readyState === ws.OPEN) {
+      p.sendJson(message);
+    }
   }
 }
 
@@ -53,7 +93,13 @@ class Player {
     ws.on('message', msg => {
       console.log('received: %s', msg);
 
-      const parsed = JSON.parse(msg);
+      let parsed;
+      try {
+        parsed = JSON.parse(msg);
+      } catch(e) {
+        console.log('got invalid json from client: ' + msg);
+        return;
+      }
 
       if ('joinAs' in parsed) {
         // client wants to join a game as a specific color
@@ -62,17 +108,12 @@ class Player {
         let game = this.server.getGame(color);
         game.join(this, color);
         this.game = game;
-
-        // update both players about whether they have an active opponent
-        this.sendJson(
-          { opponentConnected: this.getActiveOpponent() !== null });
-        this.sendOpponent({ opponentConnected: true });
       }
 
       if ('move' in parsed && this.game) {
-        // client moved, so notify other player of the move
+        // client moved
         const square = parsed['move'];
-        this.sendOpponent({ move: square, player: this.color });
+        this.game.move(this.color, square);
       }
 
       if ('endGame' in parsed) {
@@ -96,9 +137,7 @@ class Player {
 
   leaveGame(reason) {
     if (this.game !== null) {
-      this.game.players[this.color] = null;
-      this.sendOpponent({ opponentConnected: false });
-      this.game.end(reason);
+      this.game.leaveGame(this.color, reason);
       this.game = null;
     }
   }

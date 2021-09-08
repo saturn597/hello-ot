@@ -95,44 +95,24 @@ class App extends React.Component {
   }
 
   render() {
-    const connected = this.state.ws !== null;
-
-    if (!this.state.selected) {
-      return (
-        <div id="gameSelection">
-          <GameSelection
-            connected={connected}
+    return (
+      <div>
+        {this.props.devMode && <WsSender ws={this.state.ws} />}
+        {!this.state.selected ?
+          <Intro
             selectionMade={this.selectionMade}
             waiting={this.state.waiting}
+            ws={this.state.ws}
+          /> :
+          <Game
+            width={BOARDWIDTH}
+            height={BOARDHEIGHT}
+            onEnd={this.endGame}
+            player={this.state.player}
+            ws={this.state.player === null ? null : this.state.ws}
           />
-          { !connected && <p><strong>No server connection!</strong></p> }
-          <p>
-            <a href="https://en.wikipedia.org/wiki/Reversi">
-              How to play
-            </a>
-          </p>
-          <p>
-            Select "play as black" or "play as white" to play online as the
-            given color. If no one else is waiting, you may have to wait for an
-            opponent.  If you're not looking to play with someone else online,
-            you can select "play offline" to play as both black and white from
-            a single screen and have access to undo and redo buttons.
-          </p>
-        </div>
-      );
-    }
-
-    // Game doesn't need websocket if we're playing offline
-    const ws = this.state.player === null ? null : this.state.ws;
-
-    return (
-      <Game
-        width={BOARDWIDTH}
-        height={BOARDHEIGHT}
-        onEnd={this.endGame}
-        player={this.state.player}
-        ws={ws}
-      />
+        }
+      </div>
     );
   }
 }
@@ -328,17 +308,11 @@ function Board(props) {
   )
 }
 
-function PlayerChip(props) {
-  return props.player ?
-    <span className="blackChip">Black</span> :
-    <span className="whiteChip">White</span>;
-}
-
 function GameSelection(props) {
   const t = props.waiting[true];
   const f = props.waiting[false];
   return (
-    <div>
+    <div id="gameSelection">
       <button
         disabled={!props.connected}
         onClick={() => props.selectionMade(true)}
@@ -356,6 +330,39 @@ function GameSelection(props) {
       </button>
     </div>
   );
+}
+
+function Intro(props) {
+  const connected = props.ws !== null;
+
+  return (
+    <div id="intro">
+      <GameSelection
+        connected={connected}
+        selectionMade={props.selectionMade}
+        waiting={props.waiting}
+      />
+      { !connected && <p><strong>No server connection!</strong></p> }
+      <p>
+        <a href="https://en.wikipedia.org/wiki/Reversi">
+          How to play
+        </a>
+      </p>
+      <p>
+        Select "play as black" or "play as white" to play online as the
+        given color. If no one else is waiting, you may have to wait for an
+        opponent.  If you're not looking to play with someone else online,
+        you can select "play offline" to play as both black and white from
+        a single screen and have access to undo and redo buttons.
+      </p>
+    </div>
+  );
+}
+
+function PlayerChip(props) {
+  return props.player ?
+    <span className="blackChip">Black</span> :
+    <span className="whiteChip">White</span>;
 }
 
 function ScoreDisplay(props) {
@@ -476,8 +483,39 @@ function Winner(props) {
   return <div id="winnerText">{winnerText}</div>;
 }
 
+class WsSender extends React.Component {
+  constructor(props) {
+    super(props);
+    this.state = { value: '' };
+
+    this.handleChange = this.handleChange.bind(this);
+    this.handleSubmit = this.handleSubmit.bind(this);
+  }
+
+  handleChange(e) {
+    this.setState({ value: e.target.value });
+  }
+
+  handleSubmit(e) {
+    this.props.ws.send(this.state.value);
+    e.preventDefault();
+  }
+
+  render() {
+    return (
+      <form onSubmit={this.handleSubmit}>
+        <input
+          type="text"
+          onChange={this.handleChange}
+          value={this.state.value}
+        />
+        <input type="submit" value="Send" />
+      </form>
+    );
+  }
+}
 
 ReactDOM.render(
-  <App />,
+  <App devMode={true} />,
   document.getElementById('root')
 );
