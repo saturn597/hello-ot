@@ -5,15 +5,11 @@ import path from 'path';
 import ws from 'ws';
 
 import config from './config.js';
+import clientConfig from '../src/config.js';
 
 import OthelloState from '../src/othellostate.js';
 
-const gameAbortedReasons = {
-  // TODO: share code between client and server
-  opponentDisconnect: 'opponentDisconnect',
-  opponentLeft: 'opponentLeft',
-  serverConnectionLost: 'serverConnectionLost',
-};
+const gameAbortedReasons = clientConfig.gameAbortedReasons;
 
 
 class Game {
@@ -24,7 +20,8 @@ class Game {
     this.onJoin = () => {};
     this.onEnd = () => {};
 
-    this.os = OthelloState.initialState(4, 4);
+    this.os = OthelloState.initialState(
+      clientConfig.boardWidth, clientConfig.boardHeight);
   }
 
   getActivePlayers() {
@@ -237,6 +234,6 @@ const options = {
   key: fs.readFileSync(config.sslKeyPath),
 }
 const server = https.createServer(options, app);
-server.listen(config.port, () => { console.log('listening') });
+server.listen(clientConfig.port, () => { console.log('listening') });
 
 new OthelloServer({ server });

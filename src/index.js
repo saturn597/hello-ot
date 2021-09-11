@@ -3,25 +3,13 @@ import ReactDOM from 'react-dom';
 
 import './index.css';
 import OthelloState from './othellostate.js';
+import config from './config.js';
 
-// width and height of board in number of squares
-const BOARDWIDTH = 4;
-const BOARDHEIGHT = 4;
-
-// width and height of squares in pixels
-const SQUAREWIDTH = 52;
-const SQUAREHEIGHT = 52;
+const gameAbortedReasons = config.gameAbortedReasons;
 
 const loc = window.location;
-const ws_port = 10001;
+const ws_port = config.port;
 const ws_url = 'wss://' + loc.hostname + ':' + ws_port + loc.pathname;
-
-
-const gameAbortedReasons = {
-  opponentDisconnect: 'opponentDisconnect',
-  opponentLeft: 'opponentLeft',
-  serverConnectionLost: 'serverConnectionLost',
-};
 
 
 class App extends React.Component {
@@ -105,8 +93,8 @@ class App extends React.Component {
             ws={this.state.ws}
           /> :
           <Game
-            width={BOARDWIDTH}
-            height={BOARDHEIGHT}
+            width={config.boardWidth}
+            height={config.boardHeight}
             onEnd={this.endGame}
             player={this.state.player}
             ws={this.state.player === null ? null : this.state.ws}
@@ -291,7 +279,7 @@ class Game extends React.Component {
 
 
 function Board(props) {
-  const style = { width: (props.width * (SQUAREWIDTH - 1)) + 'px' };
+  const style = { width: (props.width * (config.squareWidth - 1)) + 'px' };
   const squares = props.squares.map((sq, i) =>
     <Square
       key={i}
@@ -386,8 +374,8 @@ function ScoreDisplay(props) {
 
 function Square(props) {
   const style = {
-    width: SQUAREWIDTH + 'px',
-    height: SQUAREHEIGHT + 'px',
+    width: config.squareWidth + 'px',
+    height: config.squareHeight + 'px',
   };
 
   let color = 'blank';
@@ -516,6 +504,6 @@ class WsSender extends React.Component {
 }
 
 ReactDOM.render(
-  <App devMode={true} />,
+  <App devMode={config.devMode} />,
   document.getElementById('root')
 );
