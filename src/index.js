@@ -39,6 +39,12 @@ class App extends React.Component {
     ws.addEventListener('message', this.socketMessage);
     ws.addEventListener('close', this.socketClosed);
 
+    this.keepAlive = setInterval(() => {
+      if (ws.readyState === WebSocket.OPEN) {
+        ws.send(JSON.stringify({ keepAlive: true }));
+      }
+    }, config.keepAliveDelay);
+
     this.setState({ ws });
   }
 
@@ -46,6 +52,10 @@ class App extends React.Component {
     if (this.props.ws) {
       this.props.ws.removeEventListener('close', this.socketClosed);
       this.props.ws.removeEventListener('message', this.socketMessage);
+    }
+
+    if (this.keepAlive) {
+      clearInterval(this.keepAlive);
     }
   }
 
