@@ -7,7 +7,7 @@ const gameAbortedReasons = {
 const config = {
   devMode: false,
   gameAbortedReasons,
-  port: 10001,
+  port: 443,
 
   boardWidth: 8,  // Width and height of board in squares
   boardHeight: 8,

@@ -8,9 +8,9 @@ import config from './config.js';
 const gameAbortedReasons = config.gameAbortedReasons;
 
 const loc = window.location;
+const prefix = loc.protocol === 'https:' ? 'wss' : 'ws';
 const ws_port = config.port;
-const ws_url = 'wss://' + loc.hostname + ':' + ws_port + loc.pathname;
-
+const ws_url = prefix + '://' + loc.hostname + ':' + ws_port + loc.pathname;
 
 class App extends React.Component {
   constructor(props) {

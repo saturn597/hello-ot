@@ -1,5 +1,6 @@
 import express from 'express';
 import fs from 'fs';
+import http from 'http';
 import https from 'https';
 import path from 'path';
 import ws from 'ws';
@@ -11,6 +12,7 @@ import OthelloState from '../src/othellostate.js';
 
 const gameAbortedReasons = clientConfig.gameAbortedReasons;
 
+const proto = config.secure ? https : http;
 
 class Game {
   constructor() {
@@ -233,7 +235,7 @@ const options = {
   cert: fs.readFileSync(config.sslCertPath),
   key: fs.readFileSync(config.sslKeyPath),
 }
-const server = https.createServer(options, app);
-server.listen(clientConfig.port, () => { console.log('listening') });
+const server = proto.createServer(options, app);
+server.listen(config.port, () => { console.log('listening') });
 
 new OthelloServer({ server });
