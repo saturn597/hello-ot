@@ -10,15 +10,16 @@ const gameAbortedReasons = config.gameAbortedReasons;
 const loc = window.location;
 const prefix = loc.protocol === 'https:' ? 'wss' : 'ws';
 const ws_port = config.port;
-const ws_url = prefix + '://' + loc.hostname + ':' + ws_port + loc.pathname;
+const wsUrl = prefix + '://' + loc.hostname + ':' + ws_port + loc.pathname;
 
 class App extends React.Component {
   constructor(props) {
     super(props);
     this.state = {
+      connected: false,
       selected: false,
       player: null,
-      waiting: { true: 0, false: 0 },  // # games awaiting a given color
+      waiting: { true: 0, false: 0 },  // # of games awaiting a given color
       ws: null,
     };
 
@@ -27,36 +28,41 @@ class App extends React.Component {
 
     this.socketClosed = this.socketClosed.bind(this);
     this.socketMessage = this.socketMessage.bind(this);
+    this.socketOpen = this.socketOpen.bind(this);
   }
 
   componentDidMount() {
-    const ws = new WebSocket(ws_url);
-
-    ws.onerror = e => {
-      console.log(e);
-    }
-
-    ws.addEventListener('message', this.socketMessage);
-    ws.addEventListener('close', this.socketClosed);
+    this.connectSocket();
 
     this.keepAlive = setInterval(() => {
-      if (ws.readyState === WebSocket.OPEN) {
-        ws.send(JSON.stringify({ keepAlive: true }));
+      if (this.state.ws && this.state.ws.readyState === WebSocket.OPEN) {
+        this.state.ws.send(JSON.stringify({ keepAlive: true }));
       }
     }, config.keepAliveDelay);
-
-    this.setState({ ws });
   }
 
   componentWillUnmount() {
-    if (this.props.ws) {
-      this.props.ws.removeEventListener('close', this.socketClosed);
-      this.props.ws.removeEventListener('message', this.socketMessage);
+    if (this.state.ws) {
+      this.state.ws.removeEventListener('close', this.socketClosed);
+      this.state.ws.removeEventListener('message', this.socketMessage);
+      this.state.ws.removeEventListener('open', this.socketOpen);
+      this.state.ws.close();
     }
 
     if (this.keepAlive) {
       clearInterval(this.keepAlive);
     }
+  }
+
+  connectSocket() {
+    const ws = new WebSocket(wsUrl);
+
+    ws.addEventListener('close', this.socketClosed);
+    ws.addEventListener('error', e => console.log(e));
+    ws.addEventListener('message', this.socketMessage);
+    ws.addEventListener('open', this.socketOpen);
+
+    this.setState({ ws });
   }
 
   endGame() {
@@ -79,9 +85,16 @@ class App extends React.Component {
   }
 
   socketClosed() {
-    // TODO: try to reconnect
     console.log('websocket closed');
-    this.setState({ ws: null });
+    this.state.ws.removeEventListener('close', this.socketClosed);
+    this.state.ws.removeEventListener('message', this.socketMessage);
+    this.state.ws.removeEventListener('open', this.socketOpen);
+
+    this.setState({
+      connected: false,
+    });
+
+    setTimeout(this.connectSocket.bind(this), config.reconnectDelay);
   }
 
   socketMessage(msg) {
@@ -92,12 +105,17 @@ class App extends React.Component {
     }
   }
 
+  socketOpen() {
+    this.setState({ connected: true });
+  }
+
   render() {
     return (
       <div>
         {this.props.devMode && <WsSender ws={this.state.ws} />}
         {!this.state.selected ?
           <Intro
+            connected={this.state.connected}
             selectionMade={this.selectionMade}
             waiting={this.state.waiting}
             ws={this.state.ws}
@@ -331,7 +349,7 @@ function GameSelection(props) {
 }
 
 function Intro(props) {
-  const connected = props.ws !== null;
+  const connected = props.connected;
 
   return (
     <div id="intro">
