@@ -17,6 +17,7 @@ class App extends React.Component {
     super(props);
     this.state = {
       connected: false,
+      gameStarted: false,
       selected: false,
       player: null,
       waiting: { true: 0, false: 0 },  // # of games awaiting a given color
@@ -66,19 +67,34 @@ class App extends React.Component {
   }
 
   endGame() {
+    const netplay = this.state.player !== null;
+    const open = this.state.ws && this.state.ws.readyState === WebSocket.OPEN;
+
+    if (netplay && open) {
+      this.state.ws.send(JSON.stringify({ 'endGame': true }));
+    }
+
     this.setState({
-      selected: false,
+      gameStarted: false,
       player: null,
+      selected: false,
     });
   }
 
-  selectionMade(selection) {
-    // Player selected the color they want to play as
+  selectionMade(selection, any) {
+    // Player selected the color they want to play as (or told us they don't
+    // have a preference if any === true). Null for selection means they want
+    // to play offline, so don't send anything to server in that case.
     const ws = this.state.ws;
+
     if (selection !== null && ws && ws.readyState === WebSocket.OPEN) {
-      ws.send(JSON.stringify({ joinAs: selection }));
+      // To server, join as null means they don't have a color preference
+      const selectionToSend = any ? null : selection;
+      ws.send(JSON.stringify({ joinAs: selectionToSend }));
     }
+
     this.setState({
+      gameStarted: selection === null,
       player: selection,
       selected: true,
     });
@@ -103,6 +119,16 @@ class App extends React.Component {
     if ('waiting' in parsed) {
       this.setState({ waiting: parsed.waiting });
     }
+
+    if ('opponentConnected' in parsed) {
+      if (parsed.opponentConnected === true) {
+        this.setState({ gameStarted: true });
+      }
+    }
+
+    if ('color' in parsed) {
+      this.setState({ player: parsed.color });
+    }
   }
 
   socketOpen() {
@@ -110,16 +136,22 @@ class App extends React.Component {
   }
 
   render() {
+    const pregame = this.state.selected ?
+
+      <AwaitOpponent onEnd={this.endGame} /> :
+
+      <Intro
+        connected={this.state.connected}
+        selectionMade={this.selectionMade}
+        waiting={this.state.waiting}
+        ws={this.state.ws}
+      />;
+
     return (
       <div>
         {this.props.devMode && <WsSender ws={this.state.ws} />}
-        {!this.state.selected ?
-          <Intro
-            connected={this.state.connected}
-            selectionMade={this.selectionMade}
-            waiting={this.state.waiting}
-            ws={this.state.ws}
-          /> :
+        {!this.state.gameStarted ?
+          pregame :
           <Game
             width={config.boardWidth}
             height={config.boardHeight}
@@ -150,7 +182,6 @@ class Game extends React.Component {
       gameAborted: false,
       history: [os],
       historyIndex: 0,
-      opponentConnected: false,
       os,
     };
 
@@ -174,8 +205,7 @@ class Game extends React.Component {
     const state = this.state;
 
     const gameOngoing = !state.gameAborted && !state.os.gameOver;
-    const ourTurn = state.opponentConnected &&
-      state.os.currentPlayer === props.player;
+    const ourTurn = state.os.currentPlayer === props.player;
     const playingOffline = props.player === null;
 
     return gameOngoing && (ourTurn || playingOffline);
@@ -190,12 +220,6 @@ class Game extends React.Component {
   }
 
   endGame() {
-    const netplay = this.props.player !== null;
-    const open = this.props.ws && this.props.ws.readyState === WebSocket.OPEN;
-
-    if (netplay && open) {
-      this.props.ws.send(JSON.stringify({ 'endGame': true }));
-    }
     this.props.onEnd();
   }
 
@@ -249,10 +273,6 @@ class Game extends React.Component {
       });
     }
 
-    if ('opponentConnected' in parsed) {
-      this.setState({ opponentConnected: parsed['opponentConnected'] });
-    }
-
     if ('gameEnd' in parsed) {
       const reason = parsed['gameEnd'];
       this.setState({
@@ -286,7 +306,6 @@ class Game extends React.Component {
           <Instructions
             gameAborted={this.state.gameAborted}
             os={this.state.os}
-            opponentConnected={this.state.opponentConnected}
             player={this.props.player}
             turn={this.state.os.currentPlayer}
           />
@@ -305,6 +324,15 @@ class Game extends React.Component {
   }
 }
 
+
+function AwaitOpponent(props) {
+  return (
+    <div>
+      Waiting for opponent to join...
+      <button onClick={props.onEnd}>Cancel</button>
+    </div>
+  );
+}
 
 function Board(props) {
   const style = { width: (props.width * (config.squareWidth - 1)) + 'px' };
@@ -341,6 +369,12 @@ function GameSelection(props) {
       >
         Play as white { '(' + f + ' waiting)' }
       </button>
+      <button
+        disabled={!props.connected}
+        onClick={() => props.selectionMade(false, true)}
+      >
+        Play as white OR black
+      </button>
       <button onClick={() => props.selectionMade(null)}>
         Play offline
       </button>
@@ -353,6 +387,7 @@ function Intro(props) {
 
   return (
     <div id="intro">
+      <h1>Othello</h1>
       <GameSelection
         connected={connected}
         selectionMade={props.selectionMade}
@@ -439,9 +474,6 @@ function Instructions(props) {
 
   if (props.player !== props.turn) {
     instructions = 'Wait...';
-  }
-  if (!props.opponentConnected) {
-    instructions = 'Waiting for opponent to join...';
   }
 
   if (props.gameAborted === gameAbortedReasons.opponentDisconnect) {

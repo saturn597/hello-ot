@@ -19,6 +19,8 @@ class Game {
     // "true" plays as black, "false" plays as white
     this.players = { true: null, false: null };
 
+    this.unassignedPlayer = null;  // a player who hasn't picked a color
+
     this.onJoin = () => {};
     this.onEnd = () => {};
 
@@ -40,8 +42,40 @@ class Game {
     this.onEnd(this, reason);
   }
 
+  getColorOf(player) {
+    // Get color a player is playing as
+    const res = [true, false].find(p => this.players[p] === player);
+    return res === undefined ? null : res;
+  }
+
+  getOpponent(player) {
+    const color = this.getColorOf(player);
+    if (color === null) {
+      return null;
+    }
+    return this.players[!color];
+  }
+
   join(player, color) {
+    if (color === null) {
+      this.joinUnassigned(player);
+    } else if ([true, false].includes(color)) {
+      this.joinAssigned(player, color);
+    } else {
+      console.log('Got invalid color: ' + color);
+    }
+  }
+
+  joinAssigned(player, color) {
     this.players[color] = player;
+
+    if (this.unassignedPlayer !== null) {
+      this.players[!color] = this.unassignedPlayer;
+    }
+
+    // Confirm colors for both players
+    this.sendPlayerJson(true, {'color': true});
+    this.sendPlayerJson(false, {'color': false});
 
     // update both players about whether they have an active opponent
     this.sendPlayerJson(color,
@@ -51,13 +85,47 @@ class Game {
     this.onJoin();
   }
 
-  leaveGame(color, reason) {
+  joinUnassigned(player) {
+    // add a player who hasn't picked a color
+
+    if (this.players[true]) {
+      // someone else is playing black, so make this player white
+      this.joinAssigned(player, false);
+    } else if (this.players[false]) {
+      // someone else is playing white, so make this player black
+      this.joinAssigned(player, true);
+    } else if (this.unassignedPlayer) {
+      // the second player is also unassigned, so assign both colors
+      // arbitrarily
+      this.players[true] = this.unassignedPlayer;
+      this.joinAssigned(player, false);
+    } else {
+      // no other player in this game, so just add an unassigned player and
+      // wait
+      this.unassignedPlayer = player;
+      this.onJoin();
+    }
+  }
+
+  leaveGame(player, reason) {
+    const color = this.getColorOf(player);
+    if (color === null) {
+      console.log('Player asked to leave but isn\'t in game');
+      return;
+    }
+
     this.players[color] = null;
     this.sendPlayerJson(!color, { opponentConnected: false });
     this.end(reason);
   }
 
-  move(color, square) {
+  move(player, square) {
+    const color = this.getColorOf(player);
+    if (color === null) {
+      console.log('Player asked to move but isn\'t in game');
+      return;
+    }
+
     if (color !== this.os.currentPlayer) {
       console.log('wrong color: ' + color);
       return;
@@ -83,7 +151,6 @@ class Game {
 
 class Player {
   constructor(ws, server) {
-    this.color = null;
     this.game = null;
 
     this.server = server;
@@ -103,7 +170,7 @@ class Player {
       if ('joinAs' in parsed) {
         // client wants to join a game as a specific color
         const color = parsed['joinAs'];
-        this.color = color;
+
         let game = this.server.getGame(color);
         game.join(this, color);
         this.game = game;
@@ -112,7 +179,7 @@ class Player {
       if ('move' in parsed && this.game) {
         // client moved
         const square = parsed['move'];
-        this.game.move(this.color, square);
+        this.game.move(this, square);
       }
 
       if ('endGame' in parsed) {
@@ -127,7 +194,7 @@ class Player {
 
   getActiveOpponent() {
     // returns opposing player if they are connected, otherwise returns null
-    const opponent = this.game.players[!this.color];
+    const opponent = this.game.getOpponent(this);
     if (opponent !== null && opponent.ws.readyState === ws.OPEN) {
       return opponent;
     }
@@ -136,7 +203,7 @@ class Player {
 
   leaveGame(reason) {
     if (this.game !== null) {
-      this.game.leaveGame(this.color, reason);
+      this.game.leaveGame(this, reason);
       this.game = null;
     }
   }
@@ -195,15 +262,23 @@ class OthelloServer extends ws.Server {
   }
 
   getGame(color) {
-    // try to find a game waiting for that color
-    let game = this.games.find(g => g.players[color] === null);
+    // If "color" is null, return any game that's waiting for either color.
+    // Otherwise, return any game that's waiting for the requested color.
+    // Create a game if none is available.
+
+    let finder = color === null ?
+        g => g.players[true] === null || g.players[false] === null :
+        g => g.players[color] === null;
+
+    let game = this.games.find(finder);
+
     if (!game) {
-      // create a new game if none available
       game = new Game();
       game.onEnd = this.gameEnd.bind(this);
       game.onJoin = this.gameJoin.bind(this);
       this.games.push(game);
     }
+
     return game;
   }
 
