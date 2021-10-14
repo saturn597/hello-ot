@@ -8,7 +8,6 @@ const config = {
   devMode: false,
   gameAbortedReasons,
   keepAliveDelay: 55000,
-  port: 443,
   reconnectDelay: 1000,
 
   boardWidth: 8,  // Width and height of board in squares

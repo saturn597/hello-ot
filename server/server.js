@@ -4,15 +4,26 @@ import http from 'http';
 import https from 'https';
 import path from 'path';
 import ws from 'ws';
+import yargs from 'yargs';
 
-import config from './config.js';
 import clientConfig from '../src/config.js';
 
 import OthelloState from '../src/othellostate.js';
 
-const gameAbortedReasons = clientConfig.gameAbortedReasons;
 
+const argv = yargs(process.argv.slice(2))
+  .alias('c', 'config')
+  .nargs('config', 1)
+  .argv;
+
+// Use config file given in the command line, or use default path
+const config = JSON.parse(fs.readFileSync(
+  argv.config ? argv.config : path.join(__dirname, '../config.json')
+));
+
+const gameAbortedReasons = clientConfig.gameAbortedReasons;
 const proto = config.secure ? https : http;
+
 
 class Game {
   constructor() {
@@ -304,13 +315,15 @@ class OthelloServer extends ws.Server {
 
 
 const app = express();
-app.use(express.static(config.buildPath));
+app.use(express.static(path.join(__dirname, config.filePath)));
 
 const options = {
-  cert: fs.readFileSync(config.sslCertPath),
-  key: fs.readFileSync(config.sslKeyPath),
+  cert: fs.readFileSync(path.join(__dirname, config.sslCertPath)),
+  key: fs.readFileSync(path.join(__dirname, config.sslKeyPath)),
 }
 const server = proto.createServer(options, app);
-server.listen(config.port, () => { console.log('listening') });
+server.listen(config.port, () => {
+  console.log('listening on port: ' + config.port)
+});
 
 new OthelloServer({ server });

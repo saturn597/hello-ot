@@ -9,7 +9,7 @@ const gameAbortedReasons = config.gameAbortedReasons;
 
 const loc = window.location;
 const prefix = loc.protocol === 'https:' ? 'wss' : 'ws';
-const ws_port = config.port;
+const ws_port = config.port || loc.port;
 const wsUrl = prefix + '://' + loc.hostname + ':' + ws_port + loc.pathname;
 
 class App extends React.Component {

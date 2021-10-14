@@ -1,0 +1,8 @@
+{
+  "filePath": "../../build",
+  "port": 9898,
+  "secure": false,
+  "sslCertPath": "../ssl/self.cert",
+  "sslKeyPath": "../ssl/self.key"
+}
+
