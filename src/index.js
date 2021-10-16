@@ -316,7 +316,7 @@ class Game extends React.Component {
               advanceState={this.advanceState}
             />
           }
-          <button onClick={this.endGame}>End game</button>
+          <button id="endGame" onClick={this.endGame}>End game</button>
         </div>
 
       </div>

@@ -1,5 +1,10 @@
 body {
   background-color: white;
+  margin: 10px 0 0 10px;
+}
+
+#main {
+  position: relative;
 }
 
 #board {
@@ -44,10 +49,19 @@ body {
 
 #hud {
   display: inline-block;
+  height: 100%;
   line-height: 2;
-  margin-left: 20px;
   margin-bottom: 20px;
-  padding: 10px;
+  padding: 0 10px;
+
+  position: absolute;
+  top: 0;
+  bottom: 0;
+}
+
+#endGame {
+  position: absolute;
+  bottom: 0;
 }
 
 .blackChip, .whiteChip {
