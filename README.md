@@ -15,5 +15,5 @@ To run the server:
 `npm run start` 
 
 Client configuration is in `src/config.js`.  
-Server configuration is in `server/config.js`.  
+Server configuration is in `server/config.json`.  
 For either configuration, rebuild for changes to take effect.  
