@@ -117,20 +117,31 @@ body {
 }
 
 #gameSelection button {
-  background-color: white;
   border: 2px outset #aaaaaa;
   border-radius: 5%;
   color: black;
-  margin: 2%;
+  margin: 0 2% 0 2%;
   padding: 5%;
 }
 
+#gameSelection p {
+  margin: 5% auto;
+}
+
+button.gameAvailable {
+  background-color: #7fffd4;
+}
+
+button.noGames {
+  background-color: #ffffff;
+}
+
 #gameSelection button:hover:enabled {
-  background-color: #efefef;
+  filter: brightness(85%);
 }
 
 #gameSelection button:focus {
-  background-color: #dddddd;
+  filter: brightness(75%);
   border-style: inset;
 }
 

@@ -352,60 +352,73 @@ function Board(props) {
   )
 }
 
-function GameSelection(props) {
-  const t = props.waiting[true];
-  const f = props.waiting[false];
-  return (
-    <div id="gameSelection">
-      <button
-        disabled={!props.connected}
-        onClick={() => props.selectionMade(true)}
-      >
-        Play as black { '(' + t + ' waiting)' }
-      </button>
-      <button
-        disabled={!props.connected}
-        onClick={() => props.selectionMade(false)}
-      >
-        Play as white { '(' + f + ' waiting)' }
-      </button>
-      <button
-        disabled={!props.connected}
-        onClick={() => props.selectionMade(false, true)}
-      >
-        Play as white OR black
-      </button>
-      <button onClick={() => props.selectionMade(null)}>
-        Play offline
-      </button>
-    </div>
-  );
-}
-
 function Intro(props) {
   const connected = props.connected;
+  const t = connected && props.waiting[true] > 0;
+  const f = connected && props.waiting[false] > 0;
 
   return (
     <div id="intro">
+
       <h1>Othello</h1>
-      <GameSelection
-        connected={connected}
-        selectionMade={props.selectionMade}
-        waiting={props.waiting}
-      />
-      { !connected && <p><strong>No server connection!</strong></p> }
+
       <p>
         <a href="https://en.wikipedia.org/wiki/Reversi">
-          How to play
+          About Reversi/Othello
         </a>
       </p>
-      <p>
-        Select "play as black" or "play as white" to play online as the
-        given color. If no one else is waiting, you may have to wait for an
-        opponent.  If you're not looking to play with someone else online,
-        you can select "play offline" to play as both black and white from
-        a single screen and have access to undo and redo buttons.
-      </p>
+
+      <div id="gameSelection">
+
+        { connected ?
+            <p>Which color would you like to play as? Pick an option below to
+            play against an online opponent.</p>
+          :
+          <p><strong>No server connection!</strong></p>
+        }
+        <p>
+          <button
+            className={t ? 'gameAvailable' : 'noGames'}
+            disabled={!connected}
+            onClick={() => props.selectionMade(true)}
+          >
+            Black
+          </button>
+          <button
+            className={f ? 'gameAvailable' : 'noGames'}
+            disabled={!connected}
+            onClick={() => props.selectionMade(false)}
+          >
+            White
+          </button>
+          <button
+            disabled={!connected}
+            className={t || f ? 'gameAvailable' : 'noGames'}
+            onClick={() => props.selectionMade(false, true)}
+          >
+            No preference
+          </button>
+        </p>
+
+        <p>
+          Click below if you don't want to play against someone else online.
+        </p>
+        <p>
+          <button
+            onClick={() => props.selectionMade(null)}
+            className="noGames"
+          >
+            Play both sides
+          </button>
+        </p>
+
+        <p>
+          <strong>Tip:</strong> Buttons appear green if a potential opponent is
+          already waiting.
+        </p>
+
+      </div>
+
     </div>
   );
 }
