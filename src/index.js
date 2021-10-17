@@ -106,8 +106,12 @@ class App extends React.Component {
     this.state.ws.removeEventListener('message', this.socketMessage);
     this.state.ws.removeEventListener('open', this.socketOpen);
 
-    this.setState({
-      connected: false,
+
+    this.setState((state, props) => {
+      return {
+        connected: false,
+        selected: state.gameStarted, // unselect if game hasn't started
+      };
     });
 
     setTimeout(this.connectSocket.bind(this), config.reconnectDelay);
