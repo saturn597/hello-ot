@@ -56,13 +56,13 @@ class Game {
   getColorOf(player) {
     // Get color a player is playing as
     const res = [true, false].find(p => this.players[p] === player);
-    return res === undefined ? null : res;
+    return res;
   }
 
   getOpponent(player) {
     const color = this.getColorOf(player);
-    if (color === null) {
-      return null;
+    if (color === undefined) {
+      return undefined;
     }
     return this.players[!color];
   }
@@ -120,19 +120,21 @@ class Game {
 
   leaveGame(player, reason) {
     const color = this.getColorOf(player);
-    if (color === null) {
+    if (color === undefined && !this.unassignedPlayer === player) {
       console.log('Player asked to leave but isn\'t in game');
       return;
     }
 
-    this.players[color] = null;
-    this.sendPlayerJson(!color, { opponentConnected: false });
+    if (color !== undefined) {
+      this.sendPlayerJson(!color, { opponentConnected: false });
+    }
+
     this.end(reason);
   }
 
   move(player, square) {
     const color = this.getColorOf(player);
-    if (color === null) {
+    if (color === undefined) {
       console.log('Player asked to move but isn\'t in game');
       return;
     }
@@ -204,12 +206,12 @@ class Player {
   }
 
   getActiveOpponent() {
-    // returns opposing player if they are connected, otherwise returns null
+    // returns opposing player if they are connected, otherwise returns undefined
     const opponent = this.game.getOpponent(this);
-    if (opponent !== null && opponent.ws.readyState === ws.OPEN) {
+    if (opponent !== undefined && opponent.ws.readyState === ws.OPEN) {
       return opponent;
     }
-    return null;
+    return undefined;
   }
 
   leaveGame(reason) {
@@ -227,7 +229,7 @@ class Player {
     // If opponent is connected, send a JSON encoded message to them and return
     // true. Otherwise, do nothing and return false.
     const opponent = this.getActiveOpponent();
-    if (opponent !== null) {
+    if (opponent !== undefined) {
       opponent.sendJson(msg);
       return true;
     }
