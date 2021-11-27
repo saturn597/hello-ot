@@ -8,7 +8,7 @@ import yargs from 'yargs';
 
 import clientConfig from '../src/config.js';
 
-import OthelloState from '../src/othellostate.js';
+import OthelloState from '../src/othelloState.js';
 
 
 const argv = yargs(process.argv.slice(2))
