@@ -7,11 +7,13 @@ import config from './config.js';
 import AwaitOpponent from './components/awaitOpponent.js';
 import Game from './components/game.js';
 import Intro from './components/intro.js';
+import WsSender from './components/wsSender.js';
 
 const loc = window.location;
 const prefix = loc.protocol === 'https:' ? 'wss' : 'ws';
 const ws_port = config.port || loc.port;
 const wsUrl = prefix + '://' + loc.hostname + ':' + ws_port + loc.pathname;
+
 
 class App extends React.Component {
   constructor(props) {
@@ -170,38 +172,6 @@ class App extends React.Component {
   }
 }
 
-
-class WsSender extends React.Component {
-  constructor(props) {
-    super(props);
-    this.state = { value: '' };
-
-    this.handleChange = this.handleChange.bind(this);
-    this.handleSubmit = this.handleSubmit.bind(this);
-  }
-
-  handleChange(e) {
-    this.setState({ value: e.target.value });
-  }
-
-  handleSubmit(e) {
-    this.props.ws.send(this.state.value);
-    e.preventDefault();
-  }
-
-  render() {
-    return (
-      <form onSubmit={this.handleSubmit}>
-        <input
-          type="text"
-          onChange={this.handleChange}
-          value={this.state.value}
-        />
-        <input type="submit" value="Send" />
-      </form>
-    );
-  }
-}
 
 ReactDOM.render(
   <App devMode={config.devMode} />,
