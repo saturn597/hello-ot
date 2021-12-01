@@ -174,9 +174,10 @@ class Player {
 
       let parsed;
       try {
-        parsed = JSON.parse(msg);
+        parsed = JSON.parse(msg);  // exception if msg isn't valid json
+        '' in parsed;              // exception if parsed isn't an object
       } catch(e) {
-        console.log('got invalid json from client: ' + msg);
+        console.log('got invalid message from client: ' + msg);
         return;
       }
 
